@@ -70,7 +70,7 @@ function setupWebSocketListener(tokens: { price: number, tokenId: string }[]) {
                 const tpPrice = token.price * (1 + config.LISTEN_TAKE_PROFIT)
                 if (bid.price < slPrice || bid.price >= tpPrice) {
                     console.debug(`${token.tokenId} 触发止损止盈`)
-                    const msg = `卖出token:[${token.tokenId}]\n价格:${+bid.price.toFixed(4)} 最大数量:${bid.size}\n市场:[${update.market}]`
+                    const msg = `卖出token:[${token.tokenId}]\n价格:${bid.price} 最大数量:${bid.size}\n市场:[${update.market}]`
                     await sendAlert(msg)
                 }
             }
