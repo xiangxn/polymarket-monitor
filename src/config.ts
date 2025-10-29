@@ -5,8 +5,10 @@ export const config = {
     MIN_VOLUME: parseFloat(process.env.MIN_VOLUME ?? "10000"),
     MAX_COST: parseFloat(process.env.MIN_VOLUME ?? "0.005"),
     MIN_MARKET_SPREAD: parseFloat(process.env.MIN_MARKET_SPREAD ?? "0.05"),
-    SEARCH_START_HOURS: parseInt(process.env.SEARCH_START_HOURS ?? "0"),
-    SEARCH_END_HOURS: parseInt(process.env.SEARCH_END_HOURS ?? "24"),
+    SEARCH_START_HOURS: parseFloat(process.env.SEARCH_START_HOURS ?? "0"),
+    SEARCH_END_HOURS: parseFloat(process.env.SEARCH_END_HOURS ?? "24"),
+    ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.8,0.92]"),
+    MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),
 
     // 监控
     LISTEN_TAKE_PROFIT: parseFloat(process.env.LISTEN_TAKE_PROFIT ?? "0.4"),

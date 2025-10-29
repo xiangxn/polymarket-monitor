@@ -10,43 +10,6 @@ export async function fetchWithProxy(url: string, options: any = {}) {
     return fetch(url, options);
 }
 
-export function convertTokens(market: any) {
-    const tokens: { tokenId: string; outcome: string, price: number, bid: { price: number, size: number }, ask: { price: number, size: number } }[] = []
-    if (typeof market.clobTokenIds === 'string') {
-        market.clobTokenIds = JSON.parse(market.clobTokenIds)
-    }
-    if (typeof market.outcomes === 'string') {
-        market.outcomes = JSON.parse(market.outcomes)
-    }
-    if (typeof market.outcomePrices === 'string') {
-        market.outcomePrices = JSON.parse(market.outcomePrices)
-    }
-    for (let i = 0; i < market.clobTokenIds.length; i++) {
-        const price = parseFloat(market.outcomePrices[i]?.toString() ?? "0")
-        tokens.push({
-            tokenId: market.clobTokenIds[i],
-            outcome: market.outcomes[i],
-            price: price,
-            bid: {
-                price: 0,
-                size: 0
-            },
-            ask: {
-                price: 0,
-                size: 0
-            }
-        })
-    }
-    return tokens
-}
-
-export function calcTotalPrice(outcomePrices: string | string[]): number {
-    if (typeof outcomePrices === 'string') {
-        outcomePrices = JSON.parse(outcomePrices)
-    }
-    return (outcomePrices as string[]).reduce((a: any, b: any) => parseFloat(a) + parseFloat(b), 0)
-}
-
 export const sleep = async (seconds: number) => {
     return new Promise(resolve => {
         setTimeout(() => {
