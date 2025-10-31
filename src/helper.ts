@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
 import { HttpsProxyAgent } from 'https-proxy-agent';
-import { config } from './config';
+import { getConfig } from './config';
+
+const config = getConfig()
 
 export async function fetchWithProxy(url: string, options: any = {}) {
     const proxy = config.HTTPS_PROXY;

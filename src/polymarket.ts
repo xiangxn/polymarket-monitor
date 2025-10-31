@@ -1,7 +1,9 @@
 import { fetchWithProxy, sleep } from "./helper";
 import { PolymarketEvent } from "./types";
 
-import { config } from './config';
+import { getConfig } from './config';
+
+const config = getConfig()
 
 export function convertTokens(market: any) {
     const tokens: { tokenId: string; outcome: string, price: number, bid: { price: number, size: number }, ask: { price: number, size: number } }[] = []
@@ -86,9 +88,6 @@ export async function fetchUpcomingEvents(startHours: number = 0, endHours: numb
             parsedEvents.forEach(e => {
                 // 初始化数据
                 e.tradeCount = 0
-                e.possibleProfits = []
-                e.totalProfit = 0
-                e.canSweep = { can: false, marketId: '0' }
 
                 e.markets = e.markets.filter(m => m.closed === false && m.active === true);
                 e.markets.forEach(m => {

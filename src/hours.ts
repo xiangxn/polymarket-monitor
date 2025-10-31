@@ -1,7 +1,7 @@
 import dotenv from "dotenv"
 dotenv.config()
 
-import { EventMonitor } from "./event_monitor";
+import { EventMonitor } from "./event-monitor";
 
 async function main() {
   const monitor = new EventMonitor();

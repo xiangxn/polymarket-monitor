@@ -4,8 +4,10 @@ import WebSocket from 'ws';
 import dotenv from "dotenv"
 dotenv.config()
 
-import { config } from './config';
+import { getConfig } from './config';
 import { initTelegramBot, sendAlert } from "./notifiers/telegram-notifier";
+
+const config = getConfig()
 
 initTelegramBot(
     config.TG_API_KEY,

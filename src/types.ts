@@ -8,12 +8,10 @@ export interface PolymarketEvent {
     closed: boolean;
     negRisk: boolean;
     volume: number;
-    tradeCount: number;
     markets: PolymarketMarket[];
 
-    canSweep: { can: boolean, marketId: string };
-    possibleProfits: PossibleProfit[];
-    totalProfit: number;
+    // 自定义字段
+    tradeCount: number;
 }
 
 export interface PolymarketMarket {
@@ -56,4 +54,26 @@ export interface Book {
 export interface PossibleProfit {
     tokenId: string;
     profitPct: number;
+}
+
+export interface OrderTask {
+    type: 'buy' | 'sell';
+    marketId: string;
+    tokenId: string;
+    outcome: string;
+    amount: number; // buy时为usdc数量，sell时为token数量
+    price: number;
+    createdAt: number;
+}
+
+// 暂时不考虑多订单维护，后期再升级
+export interface Position {
+    marketId: string;
+    tokenId: string;
+    outcome: string;
+    entryPrice: number;
+    size: number;
+    currentPrice: number;
+    timestamp: number;
+    realizedPnL?: number;
 }

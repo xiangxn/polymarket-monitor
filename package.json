@@ -1,29 +1,32 @@
 {
   "name": "monitor",
-  "packageManager": "yarn@4.5.2",
+  "packageManager": "yarn@4.10.3",
   "scripts": {
-    "dev": "ts-node src/index.ts",
-    "dev:e": "ts-node src/event.ts",
-    "dev:h": "ts-node src/hours.ts",
-    "dev:l": "ts-node src/listen.ts",
+    "dev": "ts-node src/main.ts",
     "test": "ts-node tests/test.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "encrypt-env": "ts-node src/utils/encrypt-env.ts"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",
     "@types/node-telegram-bot-api": "^0",
+    "@types/readline-sync": "^1",
     "@types/ws": "^8",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@ethersproject/wallet": "^5.8.0",
+    "@polymarket/clob-client": "git+https://github.com/xiangxn/clob-client.git",
     "cli-table3": "^0.6.5",
-    "console-table-printer": "^2.15.0",
     "dotenv": "^17.2.3",
+    "ethers": "^6.15.0",
     "https-proxy-agent": "^7.0.6",
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.66.0",
+    "p-queue": "^9.0.0",
+    "readline-sync": "^1.4.10",
     "stdout-update": "^4.0.1",
     "ws": "^8.18.3"
   }

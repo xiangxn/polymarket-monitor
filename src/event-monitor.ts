@@ -1,12 +1,12 @@
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import WebSocket from 'ws';
-import UpdateManager from 'stdout-update';
-import Table from "cli-table3";
 import { fetchUpcomingEvents } from './polymarket';
-import { config } from './config';
+import { getConfig } from './config';
 import { PolymarketEvent } from './types';
-import { calculateTimeToEnd, formatTimeFromMs, sleep } from './helper';
+import { sleep } from './helper';
+import { eventBus } from './event-bus';
 
+const config = getConfig();
 /**
  * 说明：
  *  - 这个文件实现了一个长期运行的 EventMonitor 类。
@@ -19,9 +19,7 @@ import { calculateTimeToEnd, formatTimeFromMs, sleep } from './helper';
 // --------------------------- EventMonitor ---------------------------
 export class EventMonitor {
     private running = false;
-    private manager = UpdateManager.getInstance();
     private globalStopRequested = false;
-    private checkEventProfits: (event: PolymarketEvent) => number;
 
     // 控制重试/退避
     private reconnectBaseMs = 1000;
@@ -30,18 +28,16 @@ export class EventMonitor {
     // 事件数据
     private events: PolymarketEvent[] = [];
 
-    constructor(detectEventProfits?: (event: PolymarketEvent) => number) {
-        this.manager.hook();
-        if (detectEventProfits) {
-            this.checkEventProfits = detectEventProfits
-        } else {
-            this.checkEventProfits = this.detectEventProfits
-        }
-        process.on('SIGINT', async () => {
-            console.info('\nSIGINT received — shutting down gracefully...');
-            await this.stop();
-            process.exit(0);
-        });
+    constructor() {
+        // process.on('SIGINT', async () => {
+        //     console.info('\nSIGINT received — shutting down gracefully...');
+        //     await this.stop();
+        //     process.exit(0);
+        // });
+    }
+
+    public getEvents() {
+        return this.events
     }
 
     public checkWindow(price: number): boolean {
@@ -50,43 +46,6 @@ export class EventMonitor {
             return false
         }
         return price >= config.ENTER_WINDOW[0] && price <= config.ENTER_WINDOW[1]
-    }
-
-    detectEventProfits(event: PolymarketEvent): number {
-        if (event.negRisk) {
-            // 互斥事件
-            const markets = event.markets.filter(m => m.negRisk)    // 只取互斥事件的市场
-            // 从价格高到低排序市场
-            markets.sort((a, b) => b.tokens[0].ask.price - a.tokens[0].ask.price)
-
-            // 扫尾盘检查
-            if (markets[0].tokens[0].ask.price - markets[1].tokens[0].ask.price > config.MIN_MARKET_SPREAD && this.checkWindow(markets[0].tokens[0].ask.price)) {
-                // 可能存在扫尾盘机会
-                event.canSweep = { can: true, marketId: markets[0].id }
-                return 1 - markets[0].tokens[0].ask.price
-            } else {
-                event.canSweep = { can: false, marketId: "0" }
-            }
-        } else {
-            // 非互斥事件
-            let totalProfit = 0
-            event.markets.forEach(m => {
-                if (!m.negRisk) {
-                    const spread = m.tokens[0].ask.price - m.tokens[1].ask.price
-                    const index = spread > 0 ? 0 : 1
-                    if (Math.abs(spread) > config.MIN_MARKET_SPREAD && this.checkWindow(m.tokens[index].ask.price)) {
-                        // 可能存在扫尾盘机会
-                        event.canSweep = { can: true, marketId: m.id }
-                        totalProfit += 1 - m.tokens[index].ask.price
-                    } else {
-                        event.canSweep = { can: false, marketId: "0" }
-                    }
-                }
-            })
-            return totalProfit
-        }
-
-        return 0
     }
 
     async start() {
@@ -103,7 +62,6 @@ export class EventMonitor {
         this.running = false;
         // 等几个 tick 让 pending things 收尾
         await new Promise(res => setTimeout(res, 500));
-        this.manager.unhook(false);
     }
 
     private async runLoop() {
@@ -123,14 +81,9 @@ export class EventMonitor {
                 }
 
                 console.info(`Fetched ${this.events.length} events to monitor.`);
-                // 启动定时刷新表格
-                const renderInterval = setInterval(() => this.renderTable(this.events), 1000);
 
                 // 监控这批事件直到它们全部结束（或监控被停止）
                 await this.monitorBatch(this.events);
-
-                // 监控结束后清除定时器
-                clearInterval(renderInterval);
 
                 // 这一轮结束后，给出短暂休息（避免速率问题）
                 await sleep(minCycleDelayMs);
@@ -206,7 +159,7 @@ export class EventMonitor {
 
                         // 处理 book
                         if (event_type === 'book') {
-                            // update bids/asks -> 同你原逻辑
+                            // update bids/asks
                             const token = market.tokens.find((t: any) => t.tokenId === update.asset_id);
                             const bidIndex = update.bids.length - 1;
                             const askIndex = update.asks.length - 1;
@@ -246,11 +199,8 @@ export class EventMonitor {
                                 }
                             });
 
-                            const totalProfit = this.checkEventProfits(event);
-                            if (event.totalProfit !== totalProfit) {
-                                event.totalProfit = totalProfit
-                            }
-                            
+                            eventBus.emit('event_update', { ...event });
+
                             const finished = checkAllEnded()
                             if (finished && !ended) {
                                 ended = true;
@@ -314,40 +264,6 @@ export class EventMonitor {
                 }
             }, guardIntervalMs);
         });
-    }
-
-    renderTable(events: PolymarketEvent[]) {
-        const p = new Table({
-            wordWrap: true,
-            head: [
-                "title",
-                "volume",
-                "endsIn",
-                "tradeCount",
-                "negRisk",
-                "canSweep",
-                "estimate",
-                "yesPrices"
-            ],
-        });
-
-        events.forEach(e => {
-            const timeToEnd = calculateTimeToEnd(e.endDate);
-            p.push([
-                `${e.title}[${e.id}]`,
-                e.volume.toLocaleString(),
-                timeToEnd < 0 ? "00:00:00" : formatTimeFromMs(timeToEnd),
-                e.tradeCount ?? 0,
-                e.negRisk ? "Y" : "N",
-                e.canSweep.can ? `Y [${e.canSweep.marketId}]` : "N",
-                timeToEnd < 0 ? "0%" : `${+(e.totalProfit * 100).toFixed(2)}%`,
-                e.markets.map((m, i) => ((i + 1) % 5 === 0 ? `${m.tokens[0].ask.price}\n` : `${m.tokens[0].ask.price ?? 0}`)).join(",")
-            ]);
-        });
-
-        // p.printTable()
-        const data = p.toString().split("\n");
-        this.manager.update(data)
     }
 }
 
