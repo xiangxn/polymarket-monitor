@@ -1,16 +1,28 @@
 import PQueue from 'p-queue';
 import { OrderTask } from './types';
+import { addCash, addPosition, getPositions, hasPosition, subCash, subPosition } from './position';
+import { getConfig } from './config';
+import fs from "fs/promises";
+import path from "path";
 
+const config = getConfig()
 const ORDER_TIMEOUT_MS = 1000;
 const MAX_PENDING = 10;
 
 const orderQueue = new PQueue({ concurrency: 3 });
 const activeKeys = new Set<string>(); // 去重 key: marketId+type
 
+export function initActiveKeys() {
+    const positions = getPositions()
+    positions.forEach(pos => {
+        const key = `${pos.marketId}:${pos.tokenId}:buy`;
+        activeKeys.add(key);
+    })
+}
 export function enqueueOrder(task: Omit<OrderTask, 'createdAt'>) {
-    const key = `${task.marketId}:${task.type}`;
+    const key = `${task.marketId}:${task.tokenId}:${task.type}`;
     if (activeKeys.has(key)) {
-        console.log(`⏸️ 重复信号跳过: ${key}`);
+        // console.log(`⏸️ 重复信号跳过: ${key}`);
         return;
     }
 
@@ -27,22 +39,50 @@ export function enqueueOrder(task: Omit<OrderTask, 'createdAt'>) {
 async function executeOrder(task: OrderTask, key: string) {
     const age = Date.now() - task.createdAt;
     if (age > ORDER_TIMEOUT_MS) {
-        console.log(`⏱️ 丢弃过期任务 ${task.marketId} (${age}ms old)`);
+        console.debug(`⏱️ 丢弃过期任务 ${task.marketId} (${age}ms old)`);
         activeKeys.delete(key);
         return;
     }
 
     try {
-        console.log(`🚀 下单执行: ${task.type.toUpperCase()} ${task.marketId}`);
+        // console.debug(`🚀 下单执行: ${task.type.toUpperCase()} ${task.marketId}`);
         await fakeApiPlaceOrder(task);
     } catch (err) {
         console.error('❌ 下单失败:', err);
     } finally {
-        activeKeys.delete(key);
+        if (hasPosition(task.tokenId) === false) {
+            activeKeys.delete(key);
+        }
     }
 }
 
+const orderList: OrderTask[] = []
+
+// TODO: 模拟代码，实际使用时替换为实际的下单函数
 async function fakeApiPlaceOrder(task: OrderTask) {
+    orderList.push(task)
     // 模拟 API 请求延迟
-    await new Promise((r) => setTimeout(r, 300 + Math.random() * 300));
+    if (task.type === 'buy') {
+        subCash(task.amount)
+        addPosition({
+            marketId: task.marketId,
+            tokenId: task.tokenId,
+            outcome: task.outcome,
+            entryPrice: task.price,
+            currentPrice: task.price,
+            stopLoss: +(task.price * (1 - config.STOP_LOSS_PERCENTAGE)).toFixed(4),
+            size: +(task.amount / task.price).toFixed(4),
+            realizedPnL: 0,
+            timestamp: Date.now()
+        })
+    } else if (task.type === 'sell') {
+        addCash(+(task.amount * task.price).toFixed(4))
+        subPosition(task.tokenId, task.amount)
+    }
+    // 保存下单数据到csv
+    const headers = Object.keys(orderList[0]);
+    const rows = orderList.map(obj => headers.map(h => obj[h as keyof typeof obj]).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const dataDir = path.join(process.cwd(), 'data');
+    await fs.writeFile(path.join(dataDir, 'orders.csv'), csv, 'utf-8');
 }

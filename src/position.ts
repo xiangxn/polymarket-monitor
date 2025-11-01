@@ -1,14 +1,34 @@
 import path from "path";
 import fs from "fs/promises";
 import { Position } from "./types";
+import { getConfig } from './config';
 
+const config = getConfig()
 // tokenId+outcome -> position
 const positions: Map<string, Position> = new Map();
 
 const dataDir = path.join(process.cwd(), 'data');
 
+let cash = 10000
+
+export function addCash(amount: number) {
+    cash += Math.abs(amount)
+}
+
+export function subCash(amount: number) {
+    cash -= Math.abs(amount)
+}
+
+export function getCash() {
+    return cash
+}
+
 export function getPositions() {
     return Array.from(positions.values());
+}
+
+export function hasPosition(tokenId: string) {
+    return positions.has(tokenId);
 }
 
 export async function initPositions() {
@@ -35,32 +55,36 @@ export async function initPositions() {
     }
 }
 
-export function onPriceUpdate(tokenId: string, outcome: string, price: number) {
-    const pos = positions.get(`${tokenId}${outcome}`);
+export function onPriceUpdate(tokenId: string, price: number): Position | undefined {
+    const pos = positions.get(tokenId);
     if (pos) {
         pos.currentPrice = price;
         pos.realizedPnL = (pos.currentPrice - pos.entryPrice) * pos.size;
     }
+    return pos
 }
 
-export function addPosition(position: Position) {
-    const pos = positions.get(`${position.tokenId}${position.outcome}`);
+export function addPosition(position: Position): Position {
+    let pos = positions.get(position.tokenId);
     if (pos) {
         pos.entryPrice = (pos.entryPrice * pos.size + position.entryPrice * position.size) / (pos.size + position.size);
         pos.currentPrice = position.currentPrice;
         pos.size += position.size;
         pos.realizedPnL = (pos.currentPrice - pos.entryPrice) * pos.size;
+        pos.stopLoss = pos.entryPrice * (1 - config.STOP_LOSS_PERCENTAGE);
     } else {
         positions.set(position.tokenId, { ...position });
+        pos = positions.get(position.tokenId);
     }
+    return pos!
 }
 
-export function subPosition(position: Position) {
-    const pos = positions.get(`${position.tokenId}${position.outcome}`);
+export function subPosition(tokenId: string, size: number) {
+    const pos = positions.get(tokenId);
     if (pos) {
-        pos.size -= position.size;
+        pos.size -= size;
         if (pos.size === 0) {
-            positions.delete(`${position.tokenId}${position.outcome}`);
+            positions.delete(tokenId);
         }
     }
 }

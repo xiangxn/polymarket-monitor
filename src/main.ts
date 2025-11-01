@@ -8,9 +8,12 @@ import { initEncryptor } from "./config";
 initEncryptor()
 
 import { EventMonitor } from './event-monitor';
-import './strategy'; // 启动策略监听
 import { calculateTimeToEnd, formatTimeFromMs } from './helper';
-import { getPositions, initPositions, savePositions } from './position';
+import { getCash, getPositions, initPositions, savePositions } from './position';
+import { initActiveKeys } from './order-queue';
+
+import './strategy'; // 启动策略监听
+
 
 async function main() {
 
@@ -26,6 +29,7 @@ async function main() {
 
     const renderTable = () => {
         // positions
+        const cash = getCash()
         const positions = getPositions()
         const events = monitor.getEvents()
         const pt = new Table({
@@ -46,7 +50,7 @@ async function main() {
                 `${p.entryPrice}`,
                 `${p.currentPrice}`,
                 `${p.size}`,
-                `${p.realizedPnL}`
+                `${p.realizedPnL ? +p.realizedPnL.toFixed(4) : 0}`
             ])
         })
         // event list
@@ -73,16 +77,18 @@ async function main() {
                 e.markets.map((m, i) => ((i + 1) % 5 === 0 ? `${m.tokens[0].ask.price}\n` : `${m.tokens[0].ask.price ?? 0}`)).join(",")
             ]);
         });
-        const data = `Positions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
+        const data = `Cash:${cash}\nPositions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
         manager.update(data)
     }
 
     // 清除控制台
     console.clear()
+    manager.hook()
     // 每秒刷新 UI
     const interval = setInterval(renderTable, 1000);
     // 加载 positions
-    await initPositions()
+    await initPositions();
+    initActiveKeys();
     await monitor.start();
     clearInterval(interval);
     manager.unhook(false);

@@ -18,15 +18,9 @@ export function initEncryptor() {
 export const getConfig = () => {
     return {
         HTTPS_PROXY: (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) ?? undefined,
-        MIN_PROFIT_BINARY: parseFloat(process.env.MIN_PROFIT_BINARY ?? "0.01"),
-        MIN_PROFIT_MULTI: parseFloat(process.env.MIN_PROFIT_MULTI ?? "0.02"),
-        MIN_VOLUME: parseFloat(process.env.MIN_VOLUME ?? "10000"),
-        MAX_COST: parseFloat(process.env.MIN_VOLUME ?? "0.005"),
-        MIN_MARKET_SPREAD: parseFloat(process.env.MIN_MARKET_SPREAD ?? "0.05"),
-        SEARCH_START_HOURS: parseFloat(process.env.SEARCH_START_HOURS ?? "0"),
-        SEARCH_END_HOURS: parseFloat(process.env.SEARCH_END_HOURS ?? "24"),
-        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.8,0.92]"),
-        MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),
+        SEARCH_START_HOURS: parseFloat(process.env.SEARCH_START_HOURS ?? "0"),  // 过滤事件结束时间end_date_min
+        SEARCH_END_HOURS: parseFloat(process.env.SEARCH_END_HOURS ?? "24"),     // 过滤事件结束时间end_date_max
+        MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),  // 每轮最小间隔
 
         // 监控
         LISTEN_TAKE_PROFIT: parseFloat(process.env.LISTEN_TAKE_PROFIT ?? "0.4"),
@@ -41,5 +35,17 @@ export const getConfig = () => {
         CLOB_API_KEY: encryptor!.decrypt(process.env.CLOB_API_KEY || ''),
         CLOB_SECRET: encryptor!.decrypt(process.env.CLOB_SECRET || ''),
         CLOB_PASS_PHRASE: encryptor!.decrypt(process.env.CLOB_PASS_PHRASE || ''),
+
+        // 策略配置
+        MIN_VOLUME: parseFloat(process.env.MIN_VOLUME ?? "10000"),  // 过滤事件最小交易量
+        MIN_MARKET_SPREAD: parseFloat(process.env.MIN_MARKET_SPREAD ?? "0.05"),     // 市场价格差,如果是互斥市场就是市场间，如果是二元市场就是市场内yes/no
+        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.8,0.92]"),         // 进入的价格窗口
+        KEEP_LAST_TRADE_TIME: parseInt(process.env.KEEP_LAST_TRADE_TIME || '10'),       // 保留最近10s的交易数据
+        STOP_LOSS_PERCENTAGE: parseFloat(process.env.STOP_LOSS_PERCENTAGE || '0.15'),   // 止损百分比
+        STOP_LOSS_DELAY: parseInt(process.env.STOP_LOSS_DELAY || '5000'),               // 止损延迟时间，单位ms
+        STOP_LOSS_MIN_VOLUME: parseFloat(process.env.STOP_LOSS_MIN_VOLUME || '200'),    // 止损最小成交量,会与STOP_LOSS_DELAY同时使用，即5秒内成交量大于200，则触发止损
+        TAKE_PROFIT_PERCENTAGE: parseFloat(process.env.TAKE_PROFIT_PERCENTAGE || '0.22'),   // 止盈百分比
+        MIN_ORDER_SIZE: parseFloat(process.env.MIN_ORDER_SIZE || '1'),      // 买入时最小金额
+        MAX_ORDER_SIZE: parseFloat(process.env.MAX_ORDER_SIZE || '100'),    // 买入时最大金额
     }
 }

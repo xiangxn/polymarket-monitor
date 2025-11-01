@@ -1,12 +1,12 @@
 import { fetchWithProxy, sleep } from "./helper";
-import { PolymarketEvent } from "./types";
+import { PolymarketEvent, Token } from "./types";
 
 import { getConfig } from './config';
 
 const config = getConfig()
 
 export function convertTokens(market: any) {
-    const tokens: { tokenId: string; outcome: string, price: number, bid: { price: number, size: number }, ask: { price: number, size: number } }[] = []
+    const tokens: Token[] = []
     if (typeof market.clobTokenIds === 'string') {
         market.clobTokenIds = JSON.parse(market.clobTokenIds)
     }
@@ -29,7 +29,9 @@ export function convertTokens(market: any) {
             ask: {
                 price: 0,
                 size: 0
-            }
+            },
+            lastBuy: [],
+            lastSell: []
         })
     }
     return tokens
@@ -80,10 +82,10 @@ export async function fetchUpcomingEvents(startHours: number = 0, endHours: numb
             const response = await fetchWithProxy(url);
             if (!response.ok) throw new Error(`API failed: ${response.status}`);
             const data = await response.json() as PolymarketEvent[];
-
+            console.log(data.length)
             if (data.length === 0) break;
 
-            // 解析tokens
+            // 过滤掉小于最小交易量的事件
             const parsedEvents = data.filter(e => (e.volume || 0) >= config.MIN_VOLUME);
             parsedEvents.forEach(e => {
                 // 初始化数据

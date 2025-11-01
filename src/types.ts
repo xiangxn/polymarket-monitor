@@ -43,6 +43,8 @@ export interface Token {
     price: number;
     bid: Book;
     ask: Book;
+    lastBuy: { time: number, price: number, size: number }[];   // 只维护最近10s的数据
+    lastSell: { time: number, price: number, size: number }[];  // 只维护最近10s的数据
 }
 
 export interface Book {
@@ -58,6 +60,7 @@ export interface PossibleProfit {
 
 export interface OrderTask {
     type: 'buy' | 'sell';
+    eventId: string;
     marketId: string;
     tokenId: string;
     outcome: string;
@@ -74,6 +77,7 @@ export interface Position {
     entryPrice: number;
     size: number;
     currentPrice: number;
+    stopLoss: number;
     timestamp: number;
     realizedPnL?: number;
 }

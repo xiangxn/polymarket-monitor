@@ -75,7 +75,7 @@ export class EventMonitor {
                 // 拉取一批 events（你已有的实现）
                 this.events = await fetchUpcomingEvents(startHours, endHours);
                 if (!this.events || this.events.length === 0) {
-                    console.debug('No events found. Sleeping for 5 minutes...');
+                    console.debug('No events found. Sleeping for 1 minutes...');
                     await sleep(60);
                     continue;
                 }
@@ -153,14 +153,17 @@ export class EventMonitor {
                         if (!['price_change', 'last_trade_price', 'book'].includes(event_type)) return;
 
                         // 找对应 event & market
-                        const event: any = events.find((e: any) => e.markets.some((m: any) => m.conditionId === update.market));
+                        const event = events.find((e: any) => e.markets.some((m: any) => m.conditionId === update.market));
                         if (!event) return;
-                        const market: any = event.markets.find((m: any) => m.conditionId === update.market);
+
+                        const market = event.markets.find((m: any) => m.conditionId === update.market);
+                        if (!market) return;
 
                         // 处理 book
                         if (event_type === 'book') {
                             // update bids/asks
                             const token = market.tokens.find((t: any) => t.tokenId === update.asset_id);
+                            if (!token) return;
                             const bidIndex = update.bids.length - 1;
                             const askIndex = update.asks.length - 1;
                             token.bid = update.bids.length > 0 ? { price: parseFloat(update.bids[bidIndex].price), size: parseFloat(update.bids[bidIndex].size) } : { price: 0, size: 0 };
@@ -174,9 +177,21 @@ export class EventMonitor {
                             const vol = parseFloat(trade.size) * parseFloat(trade.price);
                             event.volume = (event.volume || 0) + vol;
                             event.tradeCount = (event.tradeCount || 0) + 1;
+                            // 维护 lastBuy/lastSell
+                            const token = market.tokens.find((t) => t.tokenId === update.asset_id);
+                            if (!token) return;
+                            if (trade.side.toUpperCase() === 'BUY') {
+                                token.lastBuy.push({ time: Date.now(), price: parseFloat(trade.price), size: parseFloat(trade.size) });
+                                token.lastBuy = token.lastBuy.filter(t => t.time > Date.now() - config.KEEP_LAST_TRADE_TIME * 1000)
+                            } else {
+                                token.lastSell.push({ time: Date.now(), price: parseFloat(trade.price), size: parseFloat(trade.size) });
+                                token.lastSell = token.lastSell.filter(t => t.time > Date.now() - config.KEEP_LAST_TRADE_TIME * 1000)
+                            }
+                            eventBus.emit('price_update', { marketId: market.id, tokenId: token.tokenId, event });
                             // check结束
                             const finished = checkAllEnded()
                             if (finished && !ended) {
+                                eventBus.emit('batch_finished', events) //一轮完成,清仓
                                 ended = true;
                                 try { socket.close(1000, 'batch-finished'); } catch (e) { }
                                 resolve();
@@ -188,13 +203,16 @@ export class EventMonitor {
                         if (event_type === 'price_change') {
                             update.price_changes.forEach((c: any) => {
                                 const token = market.tokens.find((t: any) => t.tokenId === c.asset_id);
-                                if (token) token.price = parseFloat(c.price);
-                                const index = market.clobTokenIds.findIndex((t: string) => t === c.asset_id) ?? -1;
-                                if (index > -1) {
-                                    market.outcomePrices[index] = c.price;
-                                    if (index === 0) {
-                                        market.bestBid = parseFloat(c.best_bid);
-                                        market.bestAsk = parseFloat(c.best_ask);
+                                if (token) {
+                                    token.price = parseFloat(c.price);
+                                    eventBus.emit('price_update', { marketId: market.id, tokenId: token.tokenId, event });
+                                    const index = market.clobTokenIds.findIndex((t: string) => t === c.asset_id) ?? -1;
+                                    if (index > -1) {
+                                        market.outcomePrices[index] = c.price;
+                                        if (index === 0) {
+                                            market.bestBid = parseFloat(c.best_bid);
+                                            market.bestAsk = parseFloat(c.best_ask);
+                                        }
                                     }
                                 }
                             });
@@ -203,12 +221,12 @@ export class EventMonitor {
 
                             const finished = checkAllEnded()
                             if (finished && !ended) {
+                                eventBus.emit('batch_finished', events) //一轮完成,清仓
                                 ended = true;
                                 try { socket.close(1000, 'batch-finished'); } catch (e) { }
                                 resolve();
                             }
                         }
-
                     } catch (err) {
                         console.error('WS onmessage parse error', err);
                     }
