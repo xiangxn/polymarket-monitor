@@ -151,7 +151,7 @@ export class EventMonitor {
 
                         // 只处理感兴趣的事件
                         const { event_type } = update;
-                        if (!['price_change', 'last_trade_price', 'book'].includes(event_type)) return;
+                        if (!['last_trade_price', 'book'].includes(event_type)) return; // ['price_change', 'last_trade_price', 'book']
 
                         // 找对应 event & market
                         const event = events.find((e: any) => e.markets.some((m: any) => m.conditionId === update.market));
@@ -169,6 +169,7 @@ export class EventMonitor {
                             const askIndex = update.asks.length - 1;
                             token.bid = update.bids.length > 0 ? { price: parseFloat(update.bids[bidIndex].price), size: parseFloat(update.bids[bidIndex].size) } : { price: 0, size: 0 };
                             token.ask = update.asks.length > 0 ? { price: parseFloat(update.asks[askIndex].price), size: parseFloat(update.asks[askIndex].size) } : { price: 0, size: 0 };
+                            eventBus.emit('price_update', { marketId: market.id, tokenId: token.tokenId, event });
                             return;
                         }
 
@@ -198,34 +199,6 @@ export class EventMonitor {
                                 resolve();
                             }
                             return;
-                        }
-
-                        // 处理 price_change
-                        if (event_type === 'price_change') {
-                            update.price_changes.forEach((c: any) => {
-                                const token = market.tokens.find((t: any) => t.tokenId === c.asset_id);
-                                if (token) {
-                                    token.price = parseFloat(c.price);
-                                    eventBus.emit('price_update', { marketId: market.id, tokenId: token.tokenId, event });
-                                    const index = market.clobTokenIds.findIndex((t: string) => t === c.asset_id) ?? -1;
-                                    if (index > -1) {
-                                        market.outcomePrices[index] = c.price;
-                                        if (index === 0) {
-                                            market.bestBid = parseFloat(c.best_bid);
-                                            market.bestAsk = parseFloat(c.best_ask);
-                                        }
-                                    }
-                                }
-                            });
-
-                            eventBus.emit('event_update', { ...event });
-
-                            const finished = checkAllEnded()
-                            if (finished && !ended) {
-                                ended = true;
-                                try { socket.close(1000, 'batch-finished'); } catch (e) { }
-                                resolve();
-                            }
                         }
                     } catch (err) {
                         console.error('WS onmessage parse error', err);

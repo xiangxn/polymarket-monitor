@@ -29,8 +29,6 @@ export interface PolymarketMarket {
     // 重要数据
     tokens: Token[];
     liquidityNum: number;
-    bestBid: number;
-    bestAsk: number;
     totalPrice: number;
     // 调用需要
     orderPriceMinTickSize: number;
