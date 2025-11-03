@@ -24,7 +24,7 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
         const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY)
         const belowCount = lastSells.length
         const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)
-        if (belowCount >= 4 && totalSellVol > 200) {    // 判断止损
+        if (belowCount >= 3 && totalSellVol > config.STOP_LOSS_MIN_VOLUME) {    // 判断止损
             console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.price}, 数量: ${position.size}`)
             enqueueOrder({
                 type: 'sell',
@@ -35,7 +35,7 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                 marketId: data.marketId,
                 outcome: token.outcome
             })
-        } else if (token.price > position.entryPrice * (1 + config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= 0.98) {   // 判断止盈
+        } else if (token.bid.price > position.entryPrice * (1 + config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= config.TAKE_PROFIT_PRICE) {   // 判断止盈
             console.info(`[strategy] 止盈: ${token.tokenId}, 价格: ${token.price}, 数量: ${position.size}`)
             enqueueOrder({
                 type: 'sell',
@@ -55,7 +55,7 @@ eventBus.on('batch_finished', async (events: PolymarketEvent[]) => {
     const positions = getPositions()
     for (const pos of positions) {
         console.info(`[strategy] 止盈: ${pos.tokenId}, 数量: ${pos.size}`)
-        const event = events.find(e => e.id === e.markets.find(m => m.id === pos.marketId)!.id)!
+        const event = events.find(e => e.id === pos.eventId)!
         const token = event.markets.find(m => m.id === pos.marketId)!.tokens.find(t => t.tokenId === pos.tokenId)!
         enqueueOrder({
             type: 'sell',

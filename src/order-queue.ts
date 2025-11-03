@@ -63,8 +63,10 @@ async function fakeApiPlaceOrder(task: OrderTask) {
     orderList.push(task)
     // 模拟 API 请求延迟
     if (task.type === 'buy') {
+        // 实际操作时需要检查是否有足够的资金,或者风控停止下单
         subCash(task.amount)
         addPosition({
+            eventId: task.eventId,
             marketId: task.marketId,
             tokenId: task.tokenId,
             outcome: task.outcome,

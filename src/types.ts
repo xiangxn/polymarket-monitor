@@ -71,6 +71,7 @@ export interface OrderTask {
 
 // 暂时不考虑多订单维护，后期再升级
 export interface Position {
+    eventId: string;
     marketId: string;
     tokenId: string;
     outcome: string;

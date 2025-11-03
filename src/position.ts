@@ -13,10 +13,12 @@ let cash = 10000
 
 export function addCash(amount: number) {
     cash += Math.abs(amount)
+    cash = +cash.toFixed(4)
 }
 
 export function subCash(amount: number) {
     cash -= Math.abs(amount)
+    cash = +cash.toFixed(4)
 }
 
 export function getCash() {

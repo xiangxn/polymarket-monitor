@@ -82,7 +82,7 @@ export async function fetchUpcomingEvents(startHours: number = 0, endHours: numb
             const response = await fetchWithProxy(url);
             if (!response.ok) throw new Error(`API failed: ${response.status}`);
             const data = await response.json() as PolymarketEvent[];
-            console.log(data.length)
+            // console.log(data.length)
             if (data.length === 0) break;
 
             // 过滤掉小于最小交易量的事件

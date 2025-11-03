@@ -35,6 +35,7 @@ async function main() {
         const pt = new Table({
             wordWrap: true,
             head: [
+                "EventId",
                 "TokenId",
                 "Outcome",
                 "EntryPrice",
@@ -45,6 +46,7 @@ async function main() {
         })
         positions.forEach(p => {
             pt.push([
+                `${p.eventId}`,
                 `${p.tokenId}`,
                 `${p.outcome}`,
                 `${p.entryPrice}`,
@@ -82,8 +84,8 @@ async function main() {
     }
 
     // 清除控制台
-    console.clear()
-    manager.hook()
+    // console.clear()
+    // manager.hook()
     // 每秒刷新 UI
     const interval = setInterval(renderTable, 1000);
     // 加载 positions

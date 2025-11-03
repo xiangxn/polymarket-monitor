@@ -85,6 +85,7 @@ export class EventMonitor {
                 // 监控这批事件直到它们全部结束（或监控被停止）
                 await this.monitorBatch(this.events);
 
+                eventBus.emit('batch_finished', structuredClone(this.events)) //一轮完成,清仓
                 // 这一轮结束后，给出短暂休息（避免速率问题）
                 await sleep(minCycleDelayMs);
             } catch (err) {
@@ -180,6 +181,7 @@ export class EventMonitor {
                             // 维护 lastBuy/lastSell
                             const token = market.tokens.find((t) => t.tokenId === update.asset_id);
                             if (!token) return;
+                            token.price = parseFloat(trade.price);
                             if (trade.side.toUpperCase() === 'BUY') {
                                 token.lastBuy.push({ time: Date.now(), price: parseFloat(trade.price), size: parseFloat(trade.size) });
                                 token.lastBuy = token.lastBuy.filter(t => t.time > Date.now() - config.KEEP_LAST_TRADE_TIME * 1000)
@@ -191,7 +193,6 @@ export class EventMonitor {
                             // check结束
                             const finished = checkAllEnded()
                             if (finished && !ended) {
-                                eventBus.emit('batch_finished', events) //一轮完成,清仓
                                 ended = true;
                                 try { socket.close(1000, 'batch-finished'); } catch (e) { }
                                 resolve();
@@ -221,7 +222,6 @@ export class EventMonitor {
 
                             const finished = checkAllEnded()
                             if (finished && !ended) {
-                                eventBus.emit('batch_finished', events) //一轮完成,清仓
                                 ended = true;
                                 try { socket.close(1000, 'batch-finished'); } catch (e) { }
                                 resolve();

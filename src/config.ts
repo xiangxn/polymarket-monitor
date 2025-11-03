@@ -39,12 +39,13 @@ export const getConfig = () => {
         // 策略配置
         MIN_VOLUME: parseFloat(process.env.MIN_VOLUME ?? "10000"),  // 过滤事件最小交易量
         MIN_MARKET_SPREAD: parseFloat(process.env.MIN_MARKET_SPREAD ?? "0.05"),     // 市场价格差,如果是互斥市场就是市场间，如果是二元市场就是市场内yes/no
-        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.8,0.92]"),         // 进入的价格窗口
+        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.8,0.9]"),         // 进入的价格窗口
         KEEP_LAST_TRADE_TIME: parseInt(process.env.KEEP_LAST_TRADE_TIME || '10'),       // 保留最近10s的交易数据
         STOP_LOSS_PERCENTAGE: parseFloat(process.env.STOP_LOSS_PERCENTAGE || '0.15'),   // 止损百分比
         STOP_LOSS_DELAY: parseInt(process.env.STOP_LOSS_DELAY || '5000'),               // 止损延迟时间，单位ms
-        STOP_LOSS_MIN_VOLUME: parseFloat(process.env.STOP_LOSS_MIN_VOLUME || '200'),    // 止损最小成交量,会与STOP_LOSS_DELAY同时使用，即5秒内成交量大于200，则触发止损
+        STOP_LOSS_MIN_VOLUME: parseFloat(process.env.STOP_LOSS_MIN_VOLUME || '500'),    // 止损最小成交量,会与STOP_LOSS_DELAY同时使用，即5秒内成交量大于200，则触发止损
         TAKE_PROFIT_PERCENTAGE: parseFloat(process.env.TAKE_PROFIT_PERCENTAGE || '0.22'),   // 止盈百分比
+        TAKE_PROFIT_PRICE: parseFloat(process.env.TAKE_PROFIT_PRICE || '0.98'),             // 止盈价格
         MIN_ORDER_SIZE: parseFloat(process.env.MIN_ORDER_SIZE || '1'),      // 买入时最小金额
         MAX_ORDER_SIZE: parseFloat(process.env.MAX_ORDER_SIZE || '100'),    // 买入时最大金额
     }
