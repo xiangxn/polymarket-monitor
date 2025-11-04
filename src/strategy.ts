@@ -8,63 +8,46 @@ const config = getConfig()
 
 // 监听价格更新主要用于止盈止损
 eventBus.on('price_update', async (data: { marketId: string, tokenId: string, event: PolymarketEvent, }) => {
-    // console.log('price_update', event)
     const market = data.event.markets.find(m => m.id === data.marketId)!
-    const token = market.tokens.find(t => t.tokenId === data.tokenId)!
-    const position = onPriceUpdate(token.tokenId, token.bid.price)
-    if (position) { // 检查是否有持仓
-        if (token.bid.price < position.stopLoss) {  // 判断止损
-            const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
-            if (vols.length === 0) return
+    await Promise.all(market.tokens.map(async (token) => {
+        const position = onPriceUpdate(token.tokenId, token.bid.price)
+        if (position) { // 检查是否有持仓
+            if (token.bid.price < position.stopLoss) {  // 判断止损
+                const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
+                if (vols.length === 0) return
 
-            const now = Date.now()
-            const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
-            const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
-            const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前3次卖单的总量
-            if (lastSells.length >= 3 && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {
-                console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
+                const now = Date.now()
+                const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
+                const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
+                const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前STOP_LOSS_DELAY秒卖单的总量
+                if (lastSells.length >= 3 && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {
+                    console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
+                    enqueueOrder({
+                        type: 'sell',
+                        eventId: data.event.id,
+                        tokenId: token.tokenId,
+                        amount: position.size,
+                        price: token.bid.price,
+                        marketId: data.marketId,
+                        outcome: token.outcome
+                    })
+                }
+            } else if (token.bid.price > position.entryPrice * (1 + config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= config.TAKE_PROFIT_PRICE) {  // 判断止盈
+                console.info(`[strategy] 止盈: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
                 enqueueOrder({
                     type: 'sell',
                     eventId: data.event.id,
-                    tokenId: data.tokenId,
+                    tokenId: token.tokenId,
                     amount: position.size,
                     price: token.bid.price,
                     marketId: data.marketId,
                     outcome: token.outcome
                 })
             }
-        } else if (token.bid.price > position.entryPrice * (1 + config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= config.TAKE_PROFIT_PRICE) {  // 判断止盈
-            console.info(`[strategy] 止盈: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
-            enqueueOrder({
-                type: 'sell',
-                eventId: data.event.id,
-                tokenId: data.tokenId,
-                amount: position.size,
-                price: token.bid.price,
-                marketId: data.marketId,
-                outcome: token.outcome
-            })
+        } else {    // 检查是否有扫尾盘机会
+            await checkSignal(data.event);
         }
-        const now = Date.now()
-        const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
-        const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length
-        const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY)
-        const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)
-        if (lastSells.length >= 3 && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {    // 判断止损
-            console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
-            enqueueOrder({
-                type: 'sell',
-                eventId: data.event.id,
-                tokenId: data.tokenId,
-                amount: position.size,
-                price: token.bid.price,
-                marketId: data.marketId,
-                outcome: token.outcome
-            })
-        }
-    } else {    // 检查是否有扫尾盘机会
-        await checkSignal(data.event);
-    }
+    }))
 });
 
 // 一轮完成，清仓
