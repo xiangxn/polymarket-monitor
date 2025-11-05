@@ -21,7 +21,7 @@ const config = getConfig()
 
 
 async function main() {
-    const wallet = new Wallet(`${config.ADDRESS_PRI}`);
+    const wallet = new Wallet(`${config.OWNER_ADDRESS_PRI}`);
     const chainId = parseInt(`${process.env.CHAIN_ID || 137}`) as Chain;
     console.log(`Address: ${await wallet.getAddress()}, chainId: ${chainId}`);
 

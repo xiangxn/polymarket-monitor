@@ -19,10 +19,13 @@ const encryptor = new Encryptor(password);
 
 // List of environment variables to encrypt
 const envVars = [
-    'ADDRESS_PRI',
+    'OWNER_ADDRESS_PRI',
     'CLOB_API_KEY',
     'CLOB_SECRET',
-    'CLOB_PASS_PHRASE'
+    'CLOB_PASS_PHRASE',
+    'BUILDER_PASS_PHRASE',
+    'BUILDER_SECRET',
+    'BUILDER_API_KEY'
 ];
 
 // Encrypt each variable and print the result

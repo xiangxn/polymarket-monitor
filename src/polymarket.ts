@@ -1,9 +1,20 @@
+import { SocksProxyAgent } from "socks-proxy-agent";
 import { fetchWithProxy, sleep } from "./helper";
-import { PolymarketEvent, Token } from "./types";
+import { PolymarketEvent, PostOrderResult, Token } from "./types";
 
 import { getConfig } from './config';
+import { SignatureType } from "@polymarket/order-utils";
+import { ApiKeyCreds, Chain, ClobClient, OrderType, Side } from "@polymarket/clob-client";
+import { Wallet } from "@ethersproject/wallet";
+import { OperationType, RelayClient, SafeTransaction } from "@polymarket/builder-relayer-client";
+import { BuilderApiKeyCreds, BuilderConfig } from "@polymarket/builder-signing-sdk";
+import { axiosInstance } from '@polymarket/clob-client/dist/http-helpers/index'
+import { Interface } from "@ethersproject/abi";
+import { ethers } from "ethers";
+import { HashZero } from "@ethersproject/constants"
 
 const config = getConfig()
+type ConfigType = typeof config
 
 export function convertTokens(market: any) {
     const tokens: Token[] = []
@@ -48,7 +59,7 @@ export async function fetchTokensBook(tokens: string[]) {
     if (!Array.isArray(tokens) || tokens.length === 0) return []
 
     try {
-        const url = "https://clob.polymarket.com/books"
+        const url = `${config.CLOB_API_URL}/books`
         const response = await fetchWithProxy(url, {
             method: 'POST',
             headers: {
@@ -130,4 +141,146 @@ export async function fetchUpcomingEvents(startHours: number = 0, endHours: numb
 
     console.debug(`Fetched ${allEvents.length} events (<=${endHours}h end)`);
     return allEvents;
+}
+
+
+
+export class PolymarketClient {
+    private config: ConfigType
+    private client: ClobClient
+    private relayer: RelayClient
+
+    constructor() {
+        this.config = getConfig()
+        const wallet = new Wallet(this.config.OWNER_ADDRESS_PRI);
+        const chainId = this.config.CHAIN_ID as Chain;
+        const creds: ApiKeyCreds = {
+            key: this.config.CLOB_API_KEY,
+            secret: this.config.CLOB_SECRET,
+            passphrase: this.config.CLOB_PASS_PHRASE,
+        };
+        this.client = new ClobClient(
+            this.config.CLOB_API_URL,
+            chainId,
+            wallet,
+            creds,
+            SignatureType.POLY_GNOSIS_SAFE,
+            this.config.FUNDER_ADDRESS,
+        );
+        if (this.config.SOCKS_PROXY) {
+            const agent = new SocksProxyAgent(this.config.SOCKS_PROXY);
+            axiosInstance.defaults.proxy = false;
+            axiosInstance.defaults.httpsAgent = agent;
+            axiosInstance.defaults.httpAgent = agent;
+        }
+
+        const builderCreds: BuilderApiKeyCreds = {
+            key: this.config.BUILDER_API_KEY,
+            secret: this.config.BUILDER_SECRET,
+            passphrase: this.config.BUILDER_PASS_PHRASE
+        };
+
+        const builderConfig = new BuilderConfig({
+            localBuilderCreds: builderCreds
+        });
+        this.relayer = new RelayClient(this.config.POLYMARKET_RELAYER_URL, this.config.CHAIN_ID, wallet, builderConfig);
+        if (this.config.SOCKS_PROXY) {
+            const agent = new SocksProxyAgent(this.config.SOCKS_PROXY);
+            this.relayer.httpClient.instance.defaults.proxy = false;
+            this.relayer.httpClient.instance.defaults.httpsAgent = agent;
+            this.relayer.httpClient.instance.defaults.httpAgent = agent;
+        }
+    }
+
+    async placeOrder(tokenID: string, amount: number, side: Side, orderType: OrderType.FOK | OrderType.FAK = OrderType.FAK): Promise<PostOrderResult | null> {
+        const marketBuyOrder = await this.client.createMarketOrder({
+            tokenID,
+            amount,
+            side,
+            orderType
+        });
+        console.debug(`placeOrder:`, marketBuyOrder)
+        const resp = await this.client.postOrder(marketBuyOrder, orderType)
+        console.debug(`postOrder:`, resp)
+        if (resp.success) {
+            return { ...resp, takingAmount: parseFloat(resp.takingAmount || '0'), makingAmount: parseFloat(resp.makingAmount || '0') } as PostOrderResult
+        } else {
+            console.warn(`postOrder error:`, resp)
+            return null
+        }
+    }
+
+    async cancelMarketOrders(conditionId: string, tokenId?: string) {
+        let playload = { market: conditionId } as any
+
+        if (tokenId) {
+            playload.asset_id = tokenId
+        }
+
+        const resp = await this.client.cancelMarketOrders(playload)
+        console.debug(`cancelMarketOrders:`, resp)
+        return resp
+    }
+
+    async cancelOrders(orderIds: string[]) {
+        if (!orderIds || orderIds.length === 0) return
+        const resp = await this.client.cancelOrders(orderIds)
+        console.debug(`cancelOrders:`, resp)
+        return resp
+    }
+
+    async redeem(conditionId: string, negRisk: boolean, amounts?: string[]) {
+        if (negRisk) {
+            await redeemNegRisk(this.relayer, conditionId, amounts!)
+        } else {
+            await redeem(this.relayer, this.config.USDC_ADDRESS, conditionId)
+        }
+    }
+}
+
+export const CTF_INTERFACE = new Interface([
+    "function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint[] indexSets)"
+]);
+export const NEG_RISK_INTERFACE = new Interface([
+    "function redeemPositions(bytes32 _conditionId,uint256[] _amounts)"
+])
+
+export const encodeRedeem = (collateralToken: string, conditionId: string): string => {
+    return CTF_INTERFACE.encodeFunctionData(
+        "redeemPositions",
+        [collateralToken, HashZero, conditionId, [1, 2]],
+    );
+}
+
+export const encodeRedeemNegRisk = (conditionId: string, amounts: string[]): string => {
+    return NEG_RISK_INTERFACE.encodeFunctionData(
+        "redeemPositions",
+        [conditionId, amounts],
+    );
+}
+
+export async function redeem(client: RelayClient, collateralToken: string, conditionId: string) {
+    const redeemTx: SafeTransaction = {
+        to: config.CTF_ADDRESS,
+        operation: OperationType.Call,
+        data: encodeRedeem(collateralToken, conditionId),
+        value: "0"
+    };
+    const response = await client.execute([redeemTx], "Redeem position");
+    console.debug("redeem response:", response)
+    const result = await response.wait()
+    console.debug("redeem result:", result)
+}
+
+export async function redeemNegRisk(client: RelayClient, conditionId: string, amounts: string[]) {
+    const redeemTx: SafeTransaction = {
+        to: config.NEG_RISK_CTF_ADDRESS,
+        operation: OperationType.Call,
+        data: encodeRedeemNegRisk(conditionId, amounts),
+        value: "0"
+    };
+    const response = await client.execute([redeemTx], "Redeem position");
+    console.debug("redeemNegRisk response:", response)
+    const result = await response.wait()
+    console.debug("redeemNegRisk result:", result)
 }

@@ -79,4 +79,19 @@ export interface Position {
     stopLoss: number;
     timestamp: number;
     realizedPnL?: number;
+
+    // 服务返回的数据
+    orderID?: string;
+    txHashes?: string[];
+}
+
+export interface PostOrderResult {
+    errorMsg: string;
+    orderID: string;
+    txHashes: string[];
+    takingAmount: number;
+    makingAmount: number;
+    status: string;
+    transactionsHashes: string[];
+    success: boolean;
 }

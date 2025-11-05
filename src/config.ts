@@ -18,6 +18,7 @@ export function initEncryptor() {
 export const getConfig = () => {
     return {
         HTTPS_PROXY: (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) ?? undefined,
+        SOCKS_PROXY: process.env.SOCKS_PROXY ?? undefined,
         SEARCH_START_HOURS: parseFloat(process.env.SEARCH_START_HOURS ?? "0"),  // 过滤事件结束时间end_date_min
         SEARCH_END_HOURS: parseFloat(process.env.SEARCH_END_HOURS ?? "24"),     // 过滤事件结束时间end_date_max
         MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),  // 每轮最小间隔
@@ -30,8 +31,10 @@ export const getConfig = () => {
         TG_CHAT_ID: process.env.TG_CHAT_ID ?? "",
 
         // 操作订单
+        CLOB_API_URL: process.env.CLOB_API_URL ?? "https://clob.polymarket.com",
         CHAIN_ID: parseInt(process.env.CHAIN_ID ?? "137"),
-        ADDRESS_PRI: encryptor!.decrypt(process.env.ADDRESS_PRI || ''),
+        FUNDER_ADDRESS: process.env.FUNDER_ADDRESS ?? "",
+        OWNER_ADDRESS_PRI: encryptor!.decrypt(process.env.OWNER_ADDRESS_PRI || ''),
         CLOB_API_KEY: encryptor!.decrypt(process.env.CLOB_API_KEY || ''),
         CLOB_SECRET: encryptor!.decrypt(process.env.CLOB_SECRET || ''),
         CLOB_PASS_PHRASE: encryptor!.decrypt(process.env.CLOB_PASS_PHRASE || ''),
@@ -49,5 +52,15 @@ export const getConfig = () => {
         TAKE_PROFIT_PRICE: parseFloat(process.env.TAKE_PROFIT_PRICE || '0.98'),             // 止盈价格
         MIN_ORDER_SIZE: parseFloat(process.env.MIN_ORDER_SIZE || '1'),      // 买入时最小金额
         MAX_ORDER_SIZE: parseFloat(process.env.MAX_ORDER_SIZE || '100'),    // 买入时最大金额
+
+        // build relayer client
+        CHAIN_RPC_URL: process.env.CHAIN_RPC_URL || 'https://polygon-rpc.com',
+        USDC_ADDRESS: process.env.USDC_ADDRESS || '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+        CTF_ADDRESS: process.env.CTF_ADDRESS || '0x4d97dcd97ec945f40cf65f87097ace5ea0476045',
+        NEG_RISK_CTF_ADDRESS: process.env.NEG_RISK_CTF_ADDRESS || '0xC5d563A36AE78145C45a50134d48A1215220f80a',
+        POLYMARKET_RELAYER_URL: process.env.POLYMARKET_RELAYER_URL || 'https://relayer-v2.polymarket.com/',
+        BUILDER_API_KEY: encryptor!.decrypt(process.env.BUILDER_API_KEY || ''),
+        BUILDER_SECRET: encryptor!.decrypt(process.env.BUILDER_SECRET || ''),
+        BUILDER_PASS_PHRASE: encryptor!.decrypt(process.env.BUILDER_PASS_PHRASE || ''),
     }
 }

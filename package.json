@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@ethersproject/wallet": "^5.8.0",
+    "@polymarket/builder-relayer-client": "^0.0.6",
     "@polymarket/clob-client": "git+https://github.com/xiangxn/clob-client.git",
     "cli-table3": "^0.6.5",
     "dotenv": "^17.2.3",
