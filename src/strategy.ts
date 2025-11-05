@@ -12,6 +12,9 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
     await Promise.all(market.tokens.map(async (token) => {
         const position = onPriceUpdate(token.tokenId, token.bid.price)
         if (position) { // 检查是否有持仓
+            if (position.entryPrice === 0) {    // 如果还没有收到订单数据，就暂时跳过
+                return
+            }
             if (token.bid.price < position.stopLoss) {  // 判断止损
                 const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
                 if (vols.length === 0) return

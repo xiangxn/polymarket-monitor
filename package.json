@@ -22,7 +22,6 @@
     "@polymarket/clob-client": "git+https://github.com/xiangxn/clob-client.git",
     "cli-table3": "^0.6.5",
     "dotenv": "^17.2.3",
-    "ethers": "^6.15.0",
     "https-proxy-agent": "^7.0.6",
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.66.0",

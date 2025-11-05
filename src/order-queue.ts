@@ -1,9 +1,13 @@
 import PQueue from 'p-queue';
-import { OrderTask } from './types';
-import { addCash, addPosition, getPositions, hasPosition, subCash, subPosition } from './position';
+import { OrderMessage, OrderTask } from './types';
+import { addCash, addPosition, getCash, getPositions, hasPosition, subCash, subPosition } from './position';
 import { getConfig } from './config';
 import fs from "fs/promises";
 import path from "path";
+import { eventBus } from './event-bus';
+import { dirExists, fileExists } from './helper';
+import { PolymarketClient } from './polymarket';
+import { Side } from '@polymarket/clob-client';
 
 const config = getConfig()
 const ORDER_TIMEOUT_MS = 1000;
@@ -12,12 +16,24 @@ const MAX_PENDING = 10;
 const orderQueue = new PQueue({ concurrency: 3 });
 const activeKeys = new Set<string>(); // 去重 key: marketId+type
 
-export function initActiveKeys() {
+const dataDir = path.join(process.cwd(), 'data');
+let client: PolymarketClient | null = null;
+
+export async function initActiveKeys() {
     const positions = getPositions()
     positions.forEach(pos => {
         const key = `${pos.marketId}:${pos.tokenId}:buy`;
         activeKeys.add(key);
     })
+    if (!(await dirExists(dataDir))) {
+        await fs.mkdir(dataDir, { recursive: true });
+    }
+    const filePath = path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}.csv`);
+    if (!(await fileExists(filePath))) {
+        const headers = ['Market', 'Token', 'Outcome', 'OrderId', "Price", 'Size', 'Side', 'Timestamp']
+        await fs.writeFile(filePath, headers.join(","), 'utf-8');
+    }
+    client = new PolymarketClient()
 }
 export function enqueueOrder(task: Omit<OrderTask, 'createdAt'>) {
     const key = `${task.marketId}:${task.tokenId}:${task.type}`;
@@ -56,35 +72,78 @@ async function executeOrder(task: OrderTask, key: string) {
     }
 }
 
-const orderList: OrderTask[] = []
+const orderTasks: OrderTask[] = []
 
-// TODO: 模拟代码，实际使用时替换为实际的下单函数
+eventBus.on('order', async (order: OrderMessage) => {
+    await saveOrder(order)
+    const task = orderTasks.find(t => t.marketId === order.market && t.tokenId === order.asset_id)
+    let eventId = '0'
+    if (task) {
+        eventId = task.eventId
+    }
+    const orderType = order.type.toUpperCase()
+    const price = parseFloat(order.price)
+    const size = parseFloat(order.size_matched)
+    const amount = +(size * price).toFixed(4)
+    if (['PLACEMENT', 'UPDATE'].includes(orderType)) {
+        const side = order.side.toUpperCase()
+        if (side === 'BUY') {
+            addPosition({
+                eventId,
+                marketId: order.market,
+                tokenId: order.asset_id,
+                outcome: order.outcome,
+                entryPrice: price,
+                currentPrice: price,
+                stopLoss: 0,
+                size,
+                realizedPnL: 0,
+                timestamp: Date.now()
+            })
+            subCash(amount)
+        } else if (side === 'SELL') {
+            addCash(amount)
+            subPosition(order.asset_id, amount)
+        }
+
+    }
+})
+
 async function fakeApiPlaceOrder(task: OrderTask) {
-    orderList.push(task)
-    // 模拟 API 请求延迟
+    orderTasks.push(task)
     if (task.type === 'buy') {
-        // 实际操作时需要检查是否有足够的资金,或者风控停止下单
-        subCash(task.amount)
+        const cash = getCash()
+        if (cash < task.amount) {
+            // TODO: 后续可以向TG发通知
+            console.warn(`❌ 现金不足，无法下单: ${task.amount}`);
+            return;
+        }
+        // 添加空持仓，防止重复下单
         addPosition({
             eventId: task.eventId,
             marketId: task.marketId,
             tokenId: task.tokenId,
             outcome: task.outcome,
-            entryPrice: task.price,
-            currentPrice: task.price,
-            stopLoss: +(task.price * (1 - config.STOP_LOSS_PERCENTAGE)).toFixed(4),
-            size: +(task.amount / task.price).toFixed(4),
+            entryPrice: 0,
+            currentPrice: 0,
+            stopLoss: 0,
+            size: 0,
             realizedPnL: 0,
             timestamp: Date.now()
         })
+        await client?.placeOrder(task.tokenId, task.amount, Side.BUY)
     } else if (task.type === 'sell') {
-        addCash(+(task.amount * task.price).toFixed(4))
-        subPosition(task.tokenId, task.amount)
+        if (task.amount > 0) {
+            await client?.placeOrder(task.tokenId, task.amount, Side.SELL)
+        }
     }
-    // 保存下单数据到csv
-    const headers = Object.keys(orderList[0]);
-    const rows = orderList.map(obj => headers.map(h => obj[h as keyof typeof obj]).join(","));
-    const csv = [headers.join(","), ...rows].join("\n");
-    const dataDir = path.join(process.cwd(), 'data');
-    await fs.writeFile(path.join(dataDir, 'orders.csv'), csv, 'utf-8');
+}
+
+async function saveOrder(order: OrderMessage) {
+    if (!order) return
+
+    const filePath = path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}.csv`);
+    // ['Market', 'Token', 'Outcome', 'OrderId', "Price", 'Size', 'Side', 'Timestamp']
+    const data = [order.market, order.asset_id, order.outcome, order.id, order.price, order.size_matched, order.side, order.timestamp]
+    await fs.writeFile(filePath, data.join(",") + "\n", { flag: 'a', encoding: 'utf-8' });
 }

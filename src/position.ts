@@ -4,12 +4,12 @@ import { Position } from "./types";
 import { getConfig } from './config';
 
 const config = getConfig()
-// tokenId+outcome -> position
+// tokenId -> position
 const positions: Map<string, Position> = new Map();
 
 const dataDir = path.join(process.cwd(), 'data');
 
-let cash = 10000
+let cash = 8
 
 export function addCash(amount: number) {
     cash += Math.abs(amount)
@@ -76,7 +76,8 @@ export function addPosition(position: Position): Position {
         pos.stopLoss = pos.entryPrice * (1 - config.STOP_LOSS_PERCENTAGE);
     } else {
         positions.set(position.tokenId, { ...position });
-        pos = positions.get(position.tokenId);
+        pos = positions.get(position.tokenId)!;
+        pos.stopLoss = pos.entryPrice * (1 - config.STOP_LOSS_PERCENTAGE);
     }
     return pos!
 }

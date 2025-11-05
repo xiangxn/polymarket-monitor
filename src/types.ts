@@ -95,3 +95,20 @@ export interface PostOrderResult {
     transactionsHashes: string[];
     success: boolean;
 }
+
+export interface OrderMessage {
+    asset_id: string;
+    associate_trades: string[] | null;
+    event_type: string;
+    id: string;
+    market: string;     //	condition ID of market
+    order_owner: string;//	owner of order
+    original_size: string;//	original order size
+    outcome: string;
+    owner: string;  //	owner of orders
+    price: string;
+    side: string;   //	BUY/SELL
+    size_matched: string;//	size of order that has been matched
+    timestamp: string;
+    type: string;
+}

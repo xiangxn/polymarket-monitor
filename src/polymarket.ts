@@ -5,7 +5,6 @@ import { PolymarketEvent, PostOrderResult, Token } from "./types";
 import { getConfig } from './config';
 import { SignatureType } from "@polymarket/order-utils";
 import { ApiKeyCreds, Chain, ClobClient, OrderType, Side } from "@polymarket/clob-client";
-import { Wallet } from "@ethersproject/wallet";
 import { OperationType, RelayClient, SafeTransaction } from "@polymarket/builder-relayer-client";
 import { BuilderApiKeyCreds, BuilderConfig } from "@polymarket/builder-signing-sdk";
 import { axiosInstance } from '@polymarket/clob-client/dist/http-helpers/index'
@@ -66,14 +65,29 @@ export async function fetchTokensBook(tokens: string[]) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(tokens.map(t => ({ token_id: t })))
-        });
-        if (!response.ok) throw new Error(`API failed: ${response.status}`);
+        }, config.HTTPS_PROXY);
+        if (!response.ok) throw new Error(`CLOB API failed: ${response.status}`);
         const data = await response.json() as any[];
         return data
     } catch (e) {
         console.error("fetchTokensBook error:", e)
         return []
     }
+}
+
+export async function searchPositions(proxyWallet: string) {
+    if (ethers.utils.isAddress(proxyWallet)) {
+        try {
+            const url = `https://data-api.polymarket.com/positions?redeemable=true&limit=100&sortBy=TOKENS&sortDirection=DESC&user=${proxyWallet}`
+            const response = await fetchWithProxy(url, {}, config.HTTPS_PROXY);
+            if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
+            const data = await response.json() as any[];
+            return data
+        } catch (e) {
+            console.error("searchPositions error:", e)
+        }
+    }
+    return []
 }
 
 export async function fetchUpcomingEvents(startHours: number = 0, endHours: number = 24, maxCount: number = 10000): Promise<PolymarketEvent[]> {
@@ -90,8 +104,8 @@ export async function fetchUpcomingEvents(startHours: number = 0, endHours: numb
         const url = `https://gamma-api.polymarket.com/events?end_date_min=${nowIso}&end_date_max=${endDateMaxIso}&closed=false&offset=${offset}&limit=${limit}&order=endDate&ascending=true`;
 
         try {
-            const response = await fetchWithProxy(url);
-            if (!response.ok) throw new Error(`API failed: ${response.status}`);
+            const response = await fetchWithProxy(url, {}, config.HTTPS_PROXY);
+            if (!response.ok) throw new Error(`Gamma API failed: ${response.status}`);
             const data = await response.json() as PolymarketEvent[];
             // console.log(data.length)
             if (data.length === 0) break;
@@ -152,7 +166,8 @@ export class PolymarketClient {
 
     constructor() {
         this.config = getConfig()
-        const wallet = new Wallet(this.config.OWNER_ADDRESS_PRI);
+        const provider = new ethers.providers.JsonRpcProvider(this.config.CHAIN_RPC_URL);
+        const wallet = new ethers.Wallet(this.config.OWNER_ADDRESS_PRI, provider);
         const chainId = this.config.CHAIN_ID as Chain;
         const creds: ApiKeyCreds = {
             key: this.config.CLOB_API_KEY,
@@ -203,7 +218,10 @@ export class PolymarketClient {
         const resp = await this.client.postOrder(marketBuyOrder, orderType)
         console.debug(`postOrder:`, resp)
         if (resp.success) {
-            return { ...resp, takingAmount: parseFloat(resp.takingAmount || '0'), makingAmount: parseFloat(resp.makingAmount || '0') } as PostOrderResult
+            if (resp.status === 'matched') {
+                return { ...resp, takingAmount: parseFloat(resp.takingAmount || '0'), makingAmount: parseFloat(resp.makingAmount || '0') } as PostOrderResult
+            }
+            return null
         } else {
             console.warn(`postOrder error:`, resp)
             return null

@@ -51,7 +51,7 @@ export const getConfig = () => {
         TAKE_PROFIT_PERCENTAGE: parseFloat(process.env.TAKE_PROFIT_PERCENTAGE || '0.22'),   // 止盈百分比
         TAKE_PROFIT_PRICE: parseFloat(process.env.TAKE_PROFIT_PRICE || '0.98'),             // 止盈价格
         MIN_ORDER_SIZE: parseFloat(process.env.MIN_ORDER_SIZE || '1'),      // 买入时最小金额
-        MAX_ORDER_SIZE: parseFloat(process.env.MAX_ORDER_SIZE || '100'),    // 买入时最大金额
+        MAX_ORDER_SIZE: parseFloat(process.env.MAX_ORDER_SIZE || '1'),    // 买入时最大金额
 
         // build relayer client
         CHAIN_RPC_URL: process.env.CHAIN_RPC_URL || 'https://polygon-rpc.com',

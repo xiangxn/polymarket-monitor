@@ -8,6 +8,7 @@ import { initEncryptor } from "./config";
 initEncryptor()
 
 import { EventMonitor } from './event-monitor';
+import { UserMonitor } from './user-monitor';
 import { calculateTimeToEnd, formatTimeFromMs } from './helper';
 import { getCash, getPositions, initPositions, savePositions } from './position';
 import { initActiveKeys } from './order-queue';
@@ -15,13 +16,17 @@ import { initActiveKeys } from './order-queue';
 import './strategy'; // 启动策略监听
 
 
+
 async function main() {
 
     const manager = UpdateManager.getInstance();
 
     const monitor = new EventMonitor();
+    const userMonitor = new UserMonitor();
+
     process.on('SIGINT', async () => {
         console.info('\nSIGINT received — shutting down gracefully...');
+        await userMonitor.stop()
         await monitor.stop();
         await savePositions();
         process.exit(0);
@@ -90,7 +95,8 @@ async function main() {
     const interval = setInterval(renderTable, 1000);
     // 加载 positions
     await initPositions();
-    initActiveKeys();
+    await initActiveKeys();
+    userMonitor.start();
     await monitor.start();
     clearInterval(interval);
     manager.unhook(false);
