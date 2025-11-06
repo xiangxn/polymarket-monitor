@@ -9,11 +9,15 @@ const positions: Map<string, Position> = new Map();
 
 const dataDir = path.join(process.cwd(), 'data');
 
-let cash = 8
+let cash = 0
 
 export function addCash(amount: number) {
     cash += Math.abs(amount)
     cash = +cash.toFixed(4)
+}
+
+export function setCash(amount: number) {
+    cash = amount
 }
 
 export function subCash(amount: number) {
@@ -44,7 +48,7 @@ export async function initPositions() {
         const data = JSON.parse(content);
         if (Array.isArray(data)) {
             data.forEach(pos => {
-                positions.set(`${pos.tokenId}${pos.outcome}`, { ...pos });
+                positions.set(pos.tokenId, { ...pos });
             });
         }
     } catch (err: any) {
@@ -54,6 +58,12 @@ export async function initPositions() {
         } else {
             console.warn('[warn] positions.json 解析失败，已重置为空对象。');
         }
+    }
+    // 获取余额
+    try {
+
+    } catch (err: any) {
+        console.error(`[error] 获取余额失败: ${err.message}`)
     }
 }
 
@@ -82,11 +92,20 @@ export function addPosition(position: Position): Position {
     return pos!
 }
 
+export function delPosition(tokenId: string) {
+    const pos = positions.get(tokenId);
+    if (pos) {
+        positions.delete(tokenId);
+    } else {
+        console.log(`[delPosition] 没有找到tokenId: ${tokenId}, ${JSON.stringify(positions)}`)
+    }
+}
+
 export function subPosition(tokenId: string, size: number) {
     const pos = positions.get(tokenId);
     if (pos) {
         pos.size -= size;
-        if (pos.size === 0) {
+        if (pos.size < 0.6) {
             positions.delete(tokenId);
         }
     }

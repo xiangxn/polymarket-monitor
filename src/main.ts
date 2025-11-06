@@ -7,11 +7,13 @@ dotenv.config()
 import { initEncryptor } from "./config";
 initEncryptor()
 
+import './utils/console'
+
 import { EventMonitor } from './event-monitor';
 import { UserMonitor } from './user-monitor';
 import { calculateTimeToEnd, formatTimeFromMs } from './helper';
 import { getCash, getPositions, initPositions, savePositions } from './position';
-import { initActiveKeys } from './order-queue';
+import { initOrderQueue } from './order-queue';
 
 import './strategy'; // 启动策略监听
 
@@ -25,7 +27,7 @@ async function main() {
     const userMonitor = new UserMonitor();
 
     process.on('SIGINT', async () => {
-        console.info('\nSIGINT received — shutting down gracefully...');
+        console.info('SIGINT received — shutting down gracefully...');
         await userMonitor.stop()
         await monitor.stop();
         await savePositions();
@@ -89,13 +91,13 @@ async function main() {
     }
 
     // 清除控制台
-    // console.clear()
-    // manager.hook()
+    console.clear()
+    manager.hook()
     // 每秒刷新 UI
     const interval = setInterval(renderTable, 1000);
     // 加载 positions
     await initPositions();
-    await initActiveKeys();
+    await initOrderQueue();
     userMonitor.start();
     await monitor.start();
     clearInterval(interval);

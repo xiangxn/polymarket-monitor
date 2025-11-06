@@ -60,6 +60,7 @@ export interface OrderTask {
     type: 'buy' | 'sell';
     eventId: string;
     marketId: string;
+    conditionId: string;
     tokenId: string;
     outcome: string;
     amount: number; // buy时为usdc数量，sell时为token数量
@@ -71,6 +72,7 @@ export interface OrderTask {
 export interface Position {
     eventId: string;
     marketId: string;
+    conditionId: string;
     tokenId: string;
     outcome: string;
     entryPrice: number;

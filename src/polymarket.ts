@@ -163,11 +163,12 @@ export class PolymarketClient {
     private config: ConfigType
     private client: ClobClient
     private relayer: RelayClient
+    private provider: ethers.providers.JsonRpcProvider
 
     constructor() {
         this.config = getConfig()
-        const provider = new ethers.providers.JsonRpcProvider(this.config.CHAIN_RPC_URL);
-        const wallet = new ethers.Wallet(this.config.OWNER_ADDRESS_PRI, provider);
+        this.provider = new ethers.providers.JsonRpcProvider(this.config.CHAIN_RPC_URL);
+        const wallet = new ethers.Wallet(this.config.OWNER_ADDRESS_PRI, this.provider);
         const chainId = this.config.CHAIN_ID as Chain;
         const creds: ApiKeyCreds = {
             key: this.config.CLOB_API_KEY,
@@ -214,18 +215,15 @@ export class PolymarketClient {
             side,
             orderType
         });
-        console.debug(`placeOrder:`, marketBuyOrder)
+        console.debug(`placeOrder: ${JSON.stringify(marketBuyOrder)}`)
         const resp = await this.client.postOrder(marketBuyOrder, orderType)
-        console.debug(`postOrder:`, resp)
+        console.debug(`postOrder: ${JSON.stringify(resp)}`)
         if (resp.success) {
             if (resp.status === 'matched') {
                 return { ...resp, takingAmount: parseFloat(resp.takingAmount || '0'), makingAmount: parseFloat(resp.makingAmount || '0') } as PostOrderResult
             }
-            return null
-        } else {
-            console.warn(`postOrder error:`, resp)
-            return null
         }
+        return null
     }
 
     async cancelMarketOrders(conditionId: string, tokenId?: string) {
@@ -236,14 +234,14 @@ export class PolymarketClient {
         }
 
         const resp = await this.client.cancelMarketOrders(playload)
-        console.debug(`cancelMarketOrders:`, resp)
+        console.debug(`cancelMarketOrders: ${resp}`)
         return resp
     }
 
     async cancelOrders(orderIds: string[]) {
         if (!orderIds || orderIds.length === 0) return
         const resp = await this.client.cancelOrders(orderIds)
-        console.debug(`cancelOrders:`, resp)
+        console.debug(`cancelOrders: ${resp}`)
         return resp
     }
 
@@ -252,6 +250,31 @@ export class PolymarketClient {
             await redeemNegRisk(this.relayer, conditionId, amounts!)
         } else {
             await redeem(this.relayer, this.config.USDC_ADDRESS, conditionId)
+        }
+    }
+
+    async getBalance(funder?: string): Promise<number> {
+        if (!funder) {
+            funder = this.config.FUNDER_ADDRESS
+        }
+        const ERC20_ABI = [
+            "function balanceOf(address owner) view returns (uint256)",
+            "function decimals() view returns (uint8)",
+            "function symbol() view returns (string)"
+        ];
+        try {
+            const token = new ethers.Contract(this.config.USDC_ADDRESS, ERC20_ABI, this.provider);
+            const [decimals, symbol, rawBalance] = await Promise.all([
+                token.decimals().catch(() => 18), // 若合约没有 decimals，回退 18（很少见）
+                token.symbol().catch(() => ""),
+                token.balanceOf(funder)
+            ]);
+            const balance = ethers.utils.formatUnits(rawBalance, decimals);
+            console.debug(`${funder} balance: ${balance} ${symbol}`);
+            return +parseFloat(balance).toFixed(2)
+        } catch (err: any) {
+            console.error(`getBalance error: ${err.message ? err.message : err}`)
+            return 0
         }
     }
 }
@@ -285,9 +308,9 @@ export async function redeem(client: RelayClient, collateralToken: string, condi
         value: "0"
     };
     const response = await client.execute([redeemTx], "Redeem position");
-    console.debug("redeem response:", response)
+    console.debug(`redeem response: ${JSON.stringify(response)}`)
     const result = await response.wait()
-    console.debug("redeem result:", result)
+    console.debug(`redeem result: ${JSON.stringify(result)}`)
 }
 
 export async function redeemNegRisk(client: RelayClient, conditionId: string, amounts: string[]) {
@@ -298,7 +321,7 @@ export async function redeemNegRisk(client: RelayClient, conditionId: string, am
         value: "0"
     };
     const response = await client.execute([redeemTx], "Redeem position");
-    console.debug("redeemNegRisk response:", response)
+    console.debug(`redeemNegRisk response: ${JSON.stringify(response)}`)
     const result = await response.wait()
-    console.debug("redeemNegRisk result:", result)
+    console.debug(`redeemNegRisk result: ${JSON.stringify(result)}`)
 }

@@ -1,7 +1,6 @@
 import PQueue from 'p-queue';
 import { OrderMessage, OrderTask } from './types';
 import { addCash, addPosition, getCash, getPositions, hasPosition, subCash, subPosition } from './position';
-import { getConfig } from './config';
 import fs from "fs/promises";
 import path from "path";
 import { eventBus } from './event-bus';
@@ -9,7 +8,6 @@ import { dirExists, fileExists } from './helper';
 import { PolymarketClient } from './polymarket';
 import { Side } from '@polymarket/clob-client';
 
-const config = getConfig()
 const ORDER_TIMEOUT_MS = 1000;
 const MAX_PENDING = 10;
 
@@ -18,8 +16,9 @@ const activeKeys = new Set<string>(); // 去重 key: marketId+type
 
 const dataDir = path.join(process.cwd(), 'data');
 let client: PolymarketClient | null = null;
+let balanceTime = 0
 
-export async function initActiveKeys() {
+export async function initOrderQueue() {
     const positions = getPositions()
     positions.forEach(pos => {
         const key = `${pos.marketId}:${pos.tokenId}:buy`;
@@ -31,7 +30,7 @@ export async function initActiveKeys() {
     const filePath = path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}.csv`);
     if (!(await fileExists(filePath))) {
         const headers = ['Market', 'Token', 'Outcome', 'OrderId', "Price", 'Size', 'Side', 'Timestamp']
-        await fs.writeFile(filePath, headers.join(","), 'utf-8');
+        await fs.writeFile(filePath, headers.join(",") + "\n", 'utf-8');
     }
     client = new PolymarketClient()
 }
@@ -43,7 +42,7 @@ export function enqueueOrder(task: Omit<OrderTask, 'createdAt'>) {
     }
 
     if (orderQueue.size > MAX_PENDING) {
-        console.log('⚠️ 队列积压，丢弃新任务');
+        console.warn('⚠️ 队列积压，丢弃新任务');
         return;
     }
 
@@ -55,7 +54,7 @@ export function enqueueOrder(task: Omit<OrderTask, 'createdAt'>) {
 async function executeOrder(task: OrderTask, key: string) {
     const age = Date.now() - task.createdAt;
     if (age > ORDER_TIMEOUT_MS) {
-        console.debug(`⏱️ 丢弃过期任务 ${task.marketId} (${age}ms old)`);
+        console.warn(`⏱️ 丢弃过期任务 ${task.marketId} (${age}ms old)`);
         activeKeys.delete(key);
         return;
     }
@@ -90,7 +89,8 @@ eventBus.on('order', async (order: OrderMessage) => {
         if (side === 'BUY') {
             addPosition({
                 eventId,
-                marketId: order.market,
+                conditionId: order.market,
+                marketId: "",
                 tokenId: order.asset_id,
                 outcome: order.outcome,
                 entryPrice: price,
@@ -115,26 +115,43 @@ async function fakeApiPlaceOrder(task: OrderTask) {
         const cash = getCash()
         if (cash < task.amount) {
             // TODO: 后续可以向TG发通知
-            console.warn(`❌ 现金不足，无法下单: ${task.amount}`);
+            const now = Date.now()
+            if (now - balanceTime > 60_000) {
+                balanceTime = now
+                console.warn(`❌ 现金不足，无法下单: ${task.amount}`);
+            }
             return;
+        } else {
+            balanceTime = 0
         }
-        // 添加空持仓，防止重复下单
-        addPosition({
-            eventId: task.eventId,
-            marketId: task.marketId,
-            tokenId: task.tokenId,
-            outcome: task.outcome,
-            entryPrice: 0,
-            currentPrice: 0,
-            stopLoss: 0,
-            size: 0,
-            realizedPnL: 0,
-            timestamp: Date.now()
-        })
-        await client?.placeOrder(task.tokenId, task.amount, Side.BUY)
+
+        const result = await client?.placeOrder(task.tokenId, task.amount, Side.BUY)
+        if (!result) {
+            const key = `${task.marketId}:${task.tokenId}:${task.type}`;
+            activeKeys.delete(key);
+        } else {
+            // 添加空持仓，防止重复下单
+            addPosition({
+                eventId: task.eventId,
+                conditionId: task.conditionId,
+                marketId: task.marketId,
+                tokenId: task.tokenId,
+                outcome: task.outcome,
+                entryPrice: 0,
+                currentPrice: 0,
+                stopLoss: 0,
+                size: 0,
+                realizedPnL: 0,
+                timestamp: Date.now()
+            })
+        }
     } else if (task.type === 'sell') {
         if (task.amount > 0) {
-            await client?.placeOrder(task.tokenId, task.amount, Side.SELL)
+            const result = await client?.placeOrder(task.tokenId, task.amount, Side.SELL)
+            if (!result) {
+                const key = `${task.marketId}:${task.tokenId}:${task.type}`;
+                activeKeys.delete(key);
+            }
         }
     }
 }

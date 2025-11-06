@@ -66,7 +66,6 @@ export class EventMonitor {
 
     private async runLoop() {
         // 主循环：非递归，便于长期运行
-        const minCycleDelayMs = config.MIN_CYCLE_DELAY_MS ?? 2; // 每轮最小间隔
         while (!this.globalStopRequested) {
             try {
                 const startHours = config.SEARCH_START_HOURS;
@@ -87,7 +86,7 @@ export class EventMonitor {
 
                 eventBus.emit('batch_finished', structuredClone(this.events)) //一轮完成,清仓
                 // 这一轮结束后，给出短暂休息（避免速率问题）
-                await sleep(minCycleDelayMs);
+                await sleep(config.MIN_CYCLE_DELAY_MS);
             } catch (err) {
                 console.error('runLoop error:', err);
                 // 如果出错，等待一段时间再继续（避免 tight-loop）
@@ -95,7 +94,7 @@ export class EventMonitor {
             }
         }
 
-        console.info('EventMonitor stopped main loop.');
+        console.info('EventMonitor stopped.');
     }
 
     // 监控一批 events；当它们全部结束或 stop 被请求时返回
@@ -116,6 +115,7 @@ export class EventMonitor {
             let ws: WebSocket | null = null;
             let backoffMs = this.reconnectBaseMs;
             let ended = false;      // 表示该批次已完成（所有 events 结束）
+            let pinging = false;
 
             const createWS = () => {
                 const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
@@ -125,6 +125,19 @@ export class EventMonitor {
                     return new WebSocket(wsUrl);
                 }
             };
+
+            async function ping() {
+                if (pinging) return;
+                pinging = true;
+                while (ended) {
+                    if (ws?.readyState === WebSocket.OPEN) {
+                        ws?.send(JSON.stringify({
+                            type: 'PING'
+                        }))
+                    }
+                    await sleep(10)
+                }
+            }
 
             // 供 onmessage 使用：检查是否所有 events 都结束
             const checkAllEnded = () => {
@@ -143,9 +156,12 @@ export class EventMonitor {
                         socket.send(JSON.stringify({ type: 'MARKET', assets_ids: assetIds }));
                         console.debug(`Subscribed to ${assetIds.length} tokens for ${events.length} events`);
                     }
+                    setTimeout(() => ping(), 1000);
                 };
 
                 socket.onmessage = (raw) => {
+                    if (raw.data === 'PONG') return
+
                     try {
                         const update = JSON.parse(raw.data.toString());
 
@@ -216,6 +232,7 @@ export class EventMonitor {
 
                     // 否则我们需要重连（带退避）
                     console.debug(`WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
+                    pinging = false
                     setTimeout(() => {
                         backoffMs = Math.min(backoffMs * 1.5, this.reconnectMaxMs);
                         if (!this.globalStopRequested) {

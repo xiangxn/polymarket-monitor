@@ -2,7 +2,7 @@ import { eventBus } from './event-bus';
 import { PolymarketEvent } from './types';
 import { enqueueOrder } from './order-queue';
 import { getConfig } from './config';
-import { getPositions, onPriceUpdate } from './position';
+import { delPosition, getPositions, onPriceUpdate } from './position';
 
 const config = getConfig()
 
@@ -23,10 +23,11 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                 const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
                 const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
                 const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前STOP_LOSS_DELAY秒卖单的总量
-                if (lastSells.length >= 3 && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {
+                if (lastSells.length >= 2 && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {
                     console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
                     enqueueOrder({
                         type: 'sell',
+                        conditionId: market.conditionId,
                         eventId: data.event.id,
                         tokenId: token.tokenId,
                         amount: position.size,
@@ -39,6 +40,7 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                 console.info(`[strategy] 止盈: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
                 enqueueOrder({
                     type: 'sell',
+                    conditionId: market.conditionId,
                     eventId: data.event.id,
                     tokenId: token.tokenId,
                     amount: position.size,
@@ -56,13 +58,25 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
 // 一轮完成，清仓
 eventBus.on('batch_finished', async (events: PolymarketEvent[]) => {
     const positions = getPositions()
+    const delPs: string[] = []
     for (const pos of positions) {
-        console.info(`[strategy] 止盈: ${pos.tokenId}, 数量: ${pos.size}`)
-        const event = events.find(e => e.id === pos.eventId)!
-        const token = event.markets.find(m => m.id === pos.marketId)!.tokens.find(t => t.tokenId === pos.tokenId)!
+        if (pos.entryPrice === 0) {
+            delPs.push(pos.tokenId)
+            continue
+        }
+
+        console.info(`[strategy] 尝试止盈: ${pos.tokenId}, 数量: ${pos.size}, 如果失败, 则在后面claim`)
+        const event = events.find(e => e.id === pos.eventId)
+        if (!event) {
+            delPs.push(pos.tokenId)
+            continue
+        }
+        const market = event.markets.find(m => m.id === pos.marketId)!
+        const token = market.tokens.find(t => t.tokenId === pos.tokenId)!
         enqueueOrder({
             type: 'sell',
             eventId: event.id,
+            conditionId: market.conditionId,
             tokenId: pos.tokenId,
             amount: pos.size,
             price: token.bid.price,
@@ -70,6 +84,9 @@ eventBus.on('batch_finished', async (events: PolymarketEvent[]) => {
             outcome: token.outcome
         })
     }
+    delPs.forEach(tokenId => {
+        delPosition(tokenId)
+    })
 })
 
 function checkWindow(price: number): boolean {
@@ -95,6 +112,7 @@ async function checkSignal(event: PolymarketEvent) {
             enqueueOrder({
                 type: 'buy',
                 eventId: event.id,
+                conditionId: markets[0].conditionId,
                 marketId: markets[0].id,
                 tokenId: markets[0].tokens[0].tokenId,
                 amount: +size.toFixed(4),
@@ -114,6 +132,7 @@ async function checkSignal(event: PolymarketEvent) {
                     enqueueOrder({
                         type: 'buy',
                         eventId: event.id,
+                        conditionId: m.conditionId,
                         marketId: m.id,
                         tokenId: m.tokens[index].tokenId,
                         amount: +size.toFixed(4),

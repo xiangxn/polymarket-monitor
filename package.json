@@ -2,10 +2,10 @@
   "name": "monitor",
   "packageManager": "yarn@4.10.3",
   "scripts": {
-    "dev": "ts-node src/main.ts",
+    "dev": "NODE_ENV=development ts-node src/main.ts",
     "test": "ts-node tests/test.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "NODE_ENV=production node dist/index.js",
     "encrypt-env": "ts-node src/utils/encrypt-env.ts"
   },
   "devDependencies": {
