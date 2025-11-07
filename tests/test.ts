@@ -1,4 +1,4 @@
-import { Table } from "console-table-printer";
+import Table from 'cli-table3';
 import UpdateManager from 'stdout-update';
 
 const manager = UpdateManager.getInstance();
@@ -8,21 +8,16 @@ let counter = 0;
 
 setInterval(() => {
     const p = new Table({
-        title: "Market List",
-        columns: [
-            { name: "#", alignment: "left" },
-            { name: "Name", alignment: "right", color: "green" },
-            { name: "Balance", alignment: "right", color: "white" },
-        ],
+        head: ["#","Name","Balance"],
     });
 
     const data = [
-        { "#": counter, Name: "Alice", Balance: (Math.random() * 1000).toFixed(2) },
-        { "#": counter, Name: "Bob", Balance: (Math.random() * 1000).toFixed(2) },
+        { "#": counter+1, Name: "Alice", Balance: (Math.random() * 1000).toFixed(2) },
+        { "#": counter+2, Name: "Bob", Balance: (Math.random() * 1000).toFixed(2) },
     ]
-    p.addRows(data);
+    p.push(...data.map(d=>Object.values(d)));
 
-    manager.update(p.render().split("\n")); // 💥 原地刷新
+    manager.update(p.toString().split("\n")); // 💥 原地刷新
     counter++;
 }, 500);
 
