@@ -97,12 +97,12 @@ export class UserMonitor {
             }, backoffMs);
         };
         this.ws.onerror = (err) => {
-            console.error('User WS error', err);
+            console.error(`User WS error: ${JSON.stringify(err)}`);
         };
         this.ws.onmessage = (raw) => {
             if (raw.data === 'PONG') return
 
-            console.debug('User WS onmessage:', raw.data)
+            // console.debug('User WS onmessage:', raw.data)
 
             try {
                 const data = JSON.parse(raw.data.toString());
@@ -110,12 +110,12 @@ export class UserMonitor {
                 if (!['trade', 'order'].includes(data.event_type)) return;
 
                 if (data.event_type === 'order') {
-                    console.debug(`order: ${JSON.stringify(data)}`)
+                    console.debug(`WS order: ${JSON.stringify(data)}`)
                     eventBus.emit('order', data)
                     return
                 }
                 if (data.event_type === 'trade') {
-                    console.debug(`trade: ${JSON.stringify(data)}`)
+                    console.debug(`WS trade: ${JSON.stringify(data)}`)
                     if (data.status === 'MATCHED') {
                         eventBus.emit('order', {
                             asset_id: data.asset_id,

@@ -243,7 +243,7 @@ export class EventMonitor {
                 };
 
                 socket.onerror = (err) => {
-                    console.error('WS error', err);
+                    console.error(`WS error: ${JSON.stringify(err)}`);
                     // onerror 后可能马上 onclose，会触发重连逻辑
                 };
             };

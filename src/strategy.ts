@@ -23,7 +23,7 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                 const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
                 const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
                 const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前STOP_LOSS_DELAY秒卖单的总量
-                if (lastSells.length >= 2 && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {
+                if (lastSells.length >= config.STOP_LOSS_TRADE_COUNT && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {
                     console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
                     enqueueOrder({
                         type: 'sell',
@@ -37,6 +37,9 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                     })
                 }
             } else if (token.bid.price > position.entryPrice * (1 + config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= config.TAKE_PROFIT_PRICE) {  // 判断止盈
+                // 如果即将结束，则不止盈，减少滑点损失
+                if (new Date(market.endDate).getTime() - Date.now() <= config.TAKE_PROFIT_MIN_TIME) return
+
                 console.info(`[strategy] 止盈: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
                 enqueueOrder({
                     type: 'sell',
@@ -64,26 +67,27 @@ eventBus.on('batch_finished', async (events: PolymarketEvent[]) => {
             delPs.push(pos.tokenId)
             continue
         }
-
-        console.info(`[strategy] 尝试止盈: ${pos.tokenId}, 数量: ${pos.size}, 如果失败, 则在后面claim`)
         const event = events.find(e => e.id === pos.eventId)
         if (!event) {
             delPs.push(pos.tokenId)
             continue
         }
-        const market = event.markets.find(m => m.id === pos.marketId)!
-        const token = market.tokens.find(t => t.tokenId === pos.tokenId)!
-        enqueueOrder({
-            type: 'sell',
-            eventId: event.id,
-            conditionId: market.conditionId,
-            tokenId: pos.tokenId,
-            amount: pos.size,
-            price: token.bid.price,
-            marketId: pos.marketId,
-            outcome: token.outcome
-        })
+        console.info(`[strategy] 尝试止盈: ${pos.tokenId}, 数量: ${pos.size}, 如果失败, 则在后面claim`)
+        // 结束的事件不手动卖出，因为可能滑点
+        // const market = event.markets.find(m => m.id === pos.marketId)!
+        // const token = market.tokens.find(t => t.tokenId === pos.tokenId)!
+        // enqueueOrder({
+        //     type: 'sell',
+        //     eventId: event.id,
+        //     conditionId: market.conditionId,
+        //     tokenId: pos.tokenId,
+        //     amount: pos.size,
+        //     price: token.bid.price,
+        //     marketId: pos.marketId,
+        //     outcome: token.outcome
+        // })
     }
+    // 清理过期持仓
     delPs.forEach(tokenId => {
         delPosition(tokenId)
     })
@@ -109,6 +113,7 @@ async function checkSignal(event: PolymarketEvent) {
         if (markets[0].tokens[0].ask.price - markets[1].tokens[0].ask.price > config.MIN_MARKET_SPREAD && checkWindow(markets[0].tokens[0].ask.price)) {
             // 可能存在扫尾盘机会
             const size = Math.min(markets[0].tokens[0].ask.size * markets[0].tokens[0].ask.price, config.MAX_ORDER_SIZE)
+            if (size < config.MIN_ORDER_SIZE) return    // 平台不允许小于1usdc的单子
             enqueueOrder({
                 type: 'buy',
                 eventId: event.id,
@@ -129,6 +134,7 @@ async function checkSignal(event: PolymarketEvent) {
                 if (Math.abs(spread) > config.MIN_MARKET_SPREAD && checkWindow(m.tokens[index].ask.price)) {
                     // 可能存在扫尾盘机会
                     const size = Math.min(m.tokens[index].ask.size * m.tokens[index].ask.price, config.MAX_ORDER_SIZE)
+                    if (size < config.MIN_ORDER_SIZE) return    // 平台不允许小于1usdc的单子
                     enqueueOrder({
                         type: 'buy',
                         eventId: event.id,
