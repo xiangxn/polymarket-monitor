@@ -5,7 +5,7 @@
     "dev": "NODE_ENV=development ts-node src/main.ts",
     "test": "ts-node tests/test.ts",
     "build": "tsc",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "NODE_ENV=production node dist/src/main.js",
     "encrypt-env": "ts-node src/utils/encrypt-env.ts"
   },
   "devDependencies": {
