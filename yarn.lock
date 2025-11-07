@@ -2939,6 +2939,7 @@ __metadata:
     node-telegram-bot-api: "npm:^0.66.0"
     p-queue: "npm:^9.0.0"
     readline-sync: "npm:^1.4.10"
+    socks-proxy-agent: "npm:^8.0.5"
     stdout-update: "npm:^4.0.1"
     ts-node: "npm:^10.9.2"
     typescript: "npm:^5.9.3"
@@ -3507,7 +3508,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"socks-proxy-agent@npm:^8.0.3":
+"socks-proxy-agent@npm:^8.0.3, socks-proxy-agent@npm:^8.0.5":
   version: 8.0.5
   resolution: "socks-proxy-agent@npm:8.0.5"
   dependencies:

@@ -27,6 +27,7 @@
     "node-telegram-bot-api": "^0.66.0",
     "p-queue": "^9.0.0",
     "readline-sync": "^1.4.10",
+    "socks-proxy-agent": "^8.0.5",
     "stdout-update": "^4.0.1",
     "ws": "^8.18.3"
   }
