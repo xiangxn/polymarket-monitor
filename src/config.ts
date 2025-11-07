@@ -43,16 +43,16 @@ export const getConfig = () => {
         MIN_END_TIME: parseFloat(process.env.MIN_END_TIME ?? "5") * 60 * 1000, // 只扫最后5分钟的事件
         MIN_VOLUME: parseFloat(process.env.MIN_VOLUME ?? "1000"),  // 过滤事件最小交易量
         MIN_MARKET_SPREAD: parseFloat(process.env.MIN_MARKET_SPREAD ?? "0.2"),     // 市场价格差,如果是互斥市场就是市场间, 如果是二元市场就是市场内yes/no
-        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.84,0.92]"),         // 进入的价格窗口
+        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.82,0.9]"),         // 进入的价格窗口
         ENTER_DELAY: parseInt(process.env.ENTER_DELAY ?? "10") * 1000,                    // 进入延迟, ask价格达到后开始检查, 如果成交价满足进入窗口, 则进入, 单位秒
         KEEP_LAST_TRADE_TIME: parseInt(process.env.KEEP_LAST_TRADE_TIME || '60'),       // 保留最近60s的交易数据
-        STOP_LOSS_PERCENTAGE: parseFloat(process.env.STOP_LOSS_PERCENTAGE || '0.15'),   // 止损百分比
+        STOP_LOSS_PERCENTAGE: parseFloat(process.env.STOP_LOSS_PERCENTAGE || '0.2'),   // 止损百分比
         STOP_LOSS_DELAY: parseInt(process.env.STOP_LOSS_DELAY || '5000'),               // 止损延迟时间, 单位ms, 比如5秒内有成交价低于止损价
         STOP_LOSS_VOLUME_AVG_RATE: parseFloat(process.env.STOP_LOSS_VOLUME_AVG_RATE || '0.3'),    // STOP_LOSS_DELAY的交易量大于平均交易量的百分比，则触发止损
         STOP_LOSS_TRADE_COUNT: parseInt(process.env.STOP_LOSS_TRADE_COUNT || '3'),                // STOP_LOSS_DELAY的卖单数量>=STOP_LOSS_TRADE_COUNT，则触发止损
-        TAKE_PROFIT_PERCENTAGE: parseFloat(process.env.TAKE_PROFIT_PERCENTAGE || '0.22'),   // 止盈百分比
-        TAKE_PROFIT_PRICE: parseFloat(process.env.TAKE_PROFIT_PRICE || '0.98'),             // 止盈价格
-        TAKE_PROFIT_MIN_TIME: parseInt(process.env.TAKE_PROFIT_MIN_TIME || '1') * 60 * 1000,        // 如果止盈时间离结束时间大于此值，则不止盈
+        TAKE_PROFIT_PERCENTAGE: parseFloat(process.env.TAKE_PROFIT_PERCENTAGE || '0.3'),   // 止盈百分比
+        TAKE_PROFIT_PRICE: parseFloat(process.env.TAKE_PROFIT_PRICE || '0.99'),             // 止盈价格
+        TAKE_PROFIT_MIN_TIME: parseInt(process.env.TAKE_PROFIT_MIN_TIME || '1') * 60 * 1000,        // 如果止盈时间离结束时间<=此值，则不止盈
         MIN_ORDER_SIZE: parseFloat(process.env.MIN_ORDER_SIZE || '1'),      // 买入时最小金额, 平台不允许小于1usdc的单子
         MAX_ORDER_SIZE: parseFloat(process.env.MAX_ORDER_SIZE || '1'),    // 买入时最大金额
 
