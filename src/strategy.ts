@@ -114,16 +114,20 @@ async function checkSignal(event: PolymarketEvent) {
             // 可能存在扫尾盘机会
             const size = Math.min(markets[0].tokens[0].ask.size * markets[0].tokens[0].ask.price, config.MAX_ORDER_SIZE)
             if (size < config.MIN_ORDER_SIZE) return    // 平台不允许小于1usdc的单子
-            enqueueOrder({
-                type: 'buy',
-                eventId: event.id,
-                conditionId: markets[0].conditionId,
-                marketId: markets[0].id,
-                tokenId: markets[0].tokens[0].tokenId,
-                amount: +size.toFixed(4),
-                price: markets[0].tokens[0].ask.price,
-                outcome: markets[0].tokens[0].outcome
-            })
+            const token = markets[0].tokens[0]
+            const lastBuys = token.lastBuy.filter(s => checkWindow(s.price) && Date.now() - s.time <= config.ENTER_DELAY)
+            if (lastBuys.length >= 2) {
+                enqueueOrder({
+                    type: 'buy',
+                    eventId: event.id,
+                    conditionId: markets[0].conditionId,
+                    marketId: markets[0].id,
+                    tokenId: markets[0].tokens[0].tokenId,
+                    amount: +size.toFixed(4),
+                    price: markets[0].tokens[0].ask.price,
+                    outcome: markets[0].tokens[0].outcome
+                })
+            }
         }
     } else {
         // 非互斥事件
@@ -135,16 +139,20 @@ async function checkSignal(event: PolymarketEvent) {
                     // 可能存在扫尾盘机会
                     const size = Math.min(m.tokens[index].ask.size * m.tokens[index].ask.price, config.MAX_ORDER_SIZE)
                     if (size < config.MIN_ORDER_SIZE) return    // 平台不允许小于1usdc的单子
-                    enqueueOrder({
-                        type: 'buy',
-                        eventId: event.id,
-                        conditionId: m.conditionId,
-                        marketId: m.id,
-                        tokenId: m.tokens[index].tokenId,
-                        amount: +size.toFixed(4),
-                        price: m.tokens[index].ask.price,
-                        outcome: m.tokens[index].outcome
-                    })
+                    const token = m.tokens[index]
+                    const lastBuys = token.lastBuy.filter(s => checkWindow(s.price) && Date.now() - s.time <= config.ENTER_DELAY)
+                    if (lastBuys.length >= 2) {
+                        enqueueOrder({
+                            type: 'buy',
+                            eventId: event.id,
+                            conditionId: m.conditionId,
+                            marketId: m.id,
+                            tokenId: m.tokens[index].tokenId,
+                            amount: +size.toFixed(4),
+                            price: m.tokens[index].ask.price,
+                            outcome: m.tokens[index].outcome
+                        })
+                    }
                 }
             }
         })
