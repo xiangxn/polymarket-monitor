@@ -23,7 +23,7 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                 const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
                 const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
                 const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前STOP_LOSS_DELAY秒卖单的总量
-                if (lastSells.length >= config.STOP_LOSS_TRADE_COUNT && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE) {
+                if (lastSells.length >= config.STOP_LOSS_TRADE_COUNT && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE && position.size >= 1) {
                     console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
                     enqueueOrder({
                         type: 'sell',
