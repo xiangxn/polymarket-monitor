@@ -105,7 +105,7 @@ export function subPosition(tokenId: string, size: number) {
     const pos = positions.get(tokenId);
     if (pos) {
         pos.size -= size;
-        if (pos.size < 0.6) {
+        if (pos.size < 1) {
             positions.delete(tokenId);
         }
     }
