@@ -19,9 +19,9 @@ export const getConfig = () => {
     return {
         HTTPS_PROXY: (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) ?? undefined,
         SOCKS_PROXY: process.env.SOCKS_PROXY ?? undefined,
-        SEARCH_START_HOURS: parseFloat(process.env.SEARCH_START_HOURS ?? "0"),  // 过滤事件结束时间end_date_min
-        SEARCH_END_HOURS: parseFloat(process.env.SEARCH_END_HOURS ?? "24"),     // 过滤事件结束时间end_date_max
-        MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),  // 每轮最小间隔
+        SEARCH_START_HOURS: parseFloat(process.env.SEARCH_START_HOURS ?? "0"),  // 过滤事件结束时间end_date_min,单位m
+        SEARCH_END_HOURS: parseFloat(process.env.SEARCH_END_HOURS ?? "5"),     // 过滤事件结束时间end_date_max,单位m
+        MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),  // 每轮最小间隔,单位s
 
         // 监控
         LISTEN_TAKE_PROFIT: parseFloat(process.env.LISTEN_TAKE_PROFIT ?? "0.4"),
@@ -40,10 +40,11 @@ export const getConfig = () => {
         CLOB_PASS_PHRASE: encryptor!.decrypt(process.env.CLOB_PASS_PHRASE || ''),
 
         // 策略配置
-        MIN_END_TIME: parseFloat(process.env.MIN_END_TIME ?? "2") * 60 * 1000, // 只扫最后2分钟的事件
+        MIN_BALANCE: parseFloat(process.env.MIN_BALANCE ?? "140"),  // 最小余额，小于此值不操作
+        MIN_END_TIME: parseFloat(process.env.MIN_END_TIME ?? "50") * 1000, // 只扫最后50秒钟的事件,单位s
         MIN_VOLUME: parseFloat(process.env.MIN_VOLUME ?? "1000"),  // 过滤事件最小交易量
         MIN_MARKET_SPREAD: parseFloat(process.env.MIN_MARKET_SPREAD ?? "0.2"),     // 市场价格差,如果是互斥市场就是市场间, 如果是二元市场就是市场内yes/no
-        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.72,0.94]"),         // 进入的价格窗口
+        ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.72,0.95]"),         // 进入的价格窗口
         ENTER_DELAY: parseInt(process.env.ENTER_DELAY ?? "10") * 1000,                    // 进入延迟, ask价格达到后开始检查, 如果成交价满足进入窗口, 则进入, 单位秒
         KEEP_LAST_TRADE_TIME: parseInt(process.env.KEEP_LAST_TRADE_TIME || '60'),       // 保留最近60s的交易数据
         STOP_LOSS_PERCENTAGE: parseFloat(process.env.STOP_LOSS_PERCENTAGE || '0.2'),   // 止损百分比

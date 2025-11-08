@@ -2,7 +2,7 @@ import { eventBus } from './event-bus';
 import { PolymarketEvent } from './types';
 import { enqueueOrder } from './order-queue';
 import { getConfig } from './config';
-import { delPosition, getPositions, onPriceUpdate } from './position';
+import { delPosition, getPositions, onPriceUpdate, getCash } from './position';
 
 const config = getConfig()
 
@@ -102,6 +102,11 @@ function checkWindow(price: number): boolean {
 }
 
 async function checkSignal(event: PolymarketEvent) {
+    const cash = getCash()
+    if (cash <= config.MIN_BALANCE) {
+        console.info(`[strategy] 到达止损位置, 不进行扫尾盘检查`)
+        return
+    }
     if (new Date(event.endDate).getTime() - Date.now() > config.MIN_END_TIME) return
     if (event.negRisk) {
         // 互斥事件

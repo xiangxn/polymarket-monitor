@@ -92,8 +92,8 @@ export async function searchPositions(proxyWallet: string) {
 
 export async function fetchUpcomingEvents(startHours: number = 0, endHours: number = 24, maxCount: number = 10000): Promise<PolymarketEvent[]> {
     const now = new Date();
-    const nowIso = (new Date(now.getTime() + startHours * 60 * 60 * 1000)).toISOString();
-    const endDateMax = new Date(now.getTime() + endHours * 60 * 60 * 1000);
+    const nowIso = (new Date(now.getTime() + startHours * 60 * 1000)).toISOString();
+    const endDateMax = new Date(now.getTime() + endHours * 60 * 1000);
     const endDateMaxIso = endDateMax.toISOString();
     const limit: number = 500;
     let offset: number = 0;
