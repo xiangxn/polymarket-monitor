@@ -19,8 +19,8 @@ export const getConfig = () => {
     return {
         HTTPS_PROXY: (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) ?? undefined,
         SOCKS_PROXY: process.env.SOCKS_PROXY ?? undefined,
-        SEARCH_START_HOURS: parseFloat(process.env.SEARCH_START_HOURS ?? "0"),  // 过滤事件结束时间end_date_min,单位m
-        SEARCH_END_HOURS: parseFloat(process.env.SEARCH_END_HOURS ?? "5"),     // 过滤事件结束时间end_date_max,单位m
+        SEARCH_START_TIME: parseFloat(process.env.SEARCH_START_TIME ?? "0"),  // 过滤事件结束时间end_date_min,单位m
+        SEARCH_END_TIME: parseFloat(process.env.SEARCH_END_TIME ?? "5"),     // 过滤事件结束时间end_date_max,单位m
         MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),  // 每轮最小间隔,单位s
 
         // 监控

@@ -90,10 +90,10 @@ export async function searchPositions(proxyWallet: string) {
     return []
 }
 
-export async function fetchUpcomingEvents(startHours: number = 0, endHours: number = 24, maxCount: number = 10000): Promise<PolymarketEvent[]> {
+export async function fetchUpcomingEvents(startTime: number = 0, endTime: number = 24, maxCount: number = 10000): Promise<PolymarketEvent[]> {
     const now = new Date();
-    const nowIso = (new Date(now.getTime() + startHours * 60 * 1000)).toISOString();
-    const endDateMax = new Date(now.getTime() + endHours * 60 * 1000);
+    const nowIso = (new Date(now.getTime() + startTime * 60 * 1000)).toISOString();
+    const endDateMax = new Date(now.getTime() + endTime * 60 * 1000);
     const endDateMaxIso = endDateMax.toISOString();
     const limit: number = 500;
     let offset: number = 0;
@@ -153,7 +153,7 @@ export async function fetchUpcomingEvents(startHours: number = 0, endHours: numb
         }
     }
 
-    console.debug(`Fetched ${allEvents.length} events (<=${endHours}h end)`);
+    console.debug(`Fetched ${allEvents.length} events (<=${endTime}m end)`);
     return allEvents;
 }
 

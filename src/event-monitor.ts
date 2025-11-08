@@ -68,11 +68,11 @@ export class EventMonitor {
         // 主循环：非递归，便于长期运行
         while (!this.globalStopRequested) {
             try {
-                const startHours = config.SEARCH_START_HOURS;
-                const endHours = config.SEARCH_END_HOURS;
+                const startTime = config.SEARCH_START_TIME;
+                const endTime = config.SEARCH_END_TIME;
 
                 // 拉取一批 events（你已有的实现）
-                this.events = await fetchUpcomingEvents(startHours, endHours);
+                this.events = await fetchUpcomingEvents(startTime, endTime);
                 if (!this.events || this.events.length === 0) {
                     console.debug('No events found. Sleeping for 1 minutes...');
                     await sleep(60);
