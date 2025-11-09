@@ -65,7 +65,7 @@ export async function fetchTokensBook(tokens: string[]) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(tokens.map(t => ({ token_id: t })))
-        }, config.HTTPS_PROXY);
+        }, config.SOCKS_PROXY);
         if (!response.ok) throw new Error(`CLOB API failed: ${response.status}`);
         const data = await response.json() as any[];
         return data
@@ -79,7 +79,7 @@ export async function searchPositions(proxyWallet: string) {
     if (ethers.utils.isAddress(proxyWallet)) {
         try {
             const url = `https://data-api.polymarket.com/positions?redeemable=true&sizeThreshold=0&limit=100&sortBy=TOKENS&sortDirection=DESC&user=${proxyWallet}`
-            const response = await fetchWithProxy(url, {}, config.HTTPS_PROXY);
+            const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
             if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
             const data = await response.json() as any[];
             return data
@@ -104,7 +104,7 @@ export async function fetchUpcomingEvents(startTime: number = 0, endTime: number
         const url = `https://gamma-api.polymarket.com/events?end_date_min=${nowIso}&end_date_max=${endDateMaxIso}&closed=${closed}&offset=${offset}&limit=${limit}&order=endDate&ascending=true`;
 
         try {
-            const response = await fetchWithProxy(url, {}, config.HTTPS_PROXY);
+            const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
             if (!response.ok) throw new Error(`Gamma API failed: ${response.status}`);
             const data = await response.json() as PolymarketEvent[];
             // console.log(data.length)
@@ -293,7 +293,7 @@ export const encodeRedeem = (collateralToken: string, conditionId: string): stri
     );
 }
 
-export const encodeRedeemNegRisk = (conditionId: string, amounts: string[]): string => {
+export const encodeRedeemNegRisk = (conditionId: string, amounts: ethers.BigNumber[]): string => {
     return NEG_RISK_INTERFACE.encodeFunctionData(
         "redeemPositions",
         [conditionId, amounts],
@@ -314,10 +314,12 @@ export async function redeem(client: RelayClient, collateralToken: string, condi
 }
 
 export async function redeemNegRisk(client: RelayClient, conditionId: string, amounts: string[]) {
+    const ams = amounts.map(a => ethers.utils.parseEther(a.toString()))
+    console.debug(`redeemNegRisk amounts: ${JSON.stringify(ams)} ${JSON.stringify(amounts)}`)
     const redeemTx: SafeTransaction = {
         to: config.NEG_RISK_CTF_ADDRESS,
         operation: OperationType.Call,
-        data: encodeRedeemNegRisk(conditionId, amounts),
+        data: encodeRedeemNegRisk(conditionId, ams),
         value: "0"
     };
     const response = await client.execute([redeemTx], "Redeem position");

@@ -1,5 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 let bot: TelegramBot;
 let chatId: string;
@@ -8,7 +8,7 @@ export function initTelegramBot(token: string, chat_id: string, proxyUrl?: strin
     chatId = chat_id;
 
     if (proxyUrl) {
-        const agent = new HttpsProxyAgent(proxyUrl);
+        const agent = new SocksProxyAgent(proxyUrl);
 
         bot = new TelegramBot(token, {
             polling: false,

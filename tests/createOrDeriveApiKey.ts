@@ -6,10 +6,9 @@ dotenvConfig({ path: resolve(__dirname, "../.env") });
 import { initEncryptor } from "../src/config";
 initEncryptor()
 
-import { HttpsProxyAgent } from 'https-proxy-agent';
 import { axiosInstance } from "@polymarket/clob-client/dist/http-helpers/index";
 
-const agent = new HttpsProxyAgent('http://127.0.0.1:1087');
+const agent = new SocksProxyAgent('socks5h://127.0.0.1:1080');
 
 axiosInstance.defaults.proxy = false;
 axiosInstance.defaults.httpsAgent = agent;
@@ -18,6 +17,7 @@ axiosInstance.defaults.httpAgent = agent;
 import { getConfig } from "../src/config";
 import { ApiKeyCreds, Chain, ClobClient } from "@polymarket/clob-client";
 import { Wallet } from "@ethersproject/wallet";
+import { SocksProxyAgent } from "socks-proxy-agent";
 
 const config = getConfig()
 

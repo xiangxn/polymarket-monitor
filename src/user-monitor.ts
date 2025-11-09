@@ -1,10 +1,10 @@
-import { HttpsProxyAgent } from 'https-proxy-agent';
 import WebSocket from 'ws';
 import { PolymarketClient, searchPositions } from './polymarket';
 import { getConfig } from './config';
 import { chunkArray, sleep } from './helper';
 import { eventBus } from './event-bus';
 import { setCash } from './position';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 const config = getConfig();
 
@@ -37,8 +37,8 @@ export class UserMonitor {
     }
 
     private createWS() {
-        if (config.HTTPS_PROXY) {
-            this.ws = new WebSocket(this.wsUrl, { agent: new HttpsProxyAgent(config.HTTPS_PROXY) as any });
+        if (config.SOCKS_PROXY) {
+            this.ws = new WebSocket(this.wsUrl, { agent: new SocksProxyAgent(config.SOCKS_PROXY) as any });
         } else {
             this.ws = new WebSocket(this.wsUrl);
         }

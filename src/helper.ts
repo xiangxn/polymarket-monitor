@@ -1,12 +1,12 @@
 import fetch from 'node-fetch';
-import { HttpsProxyAgent } from 'https-proxy-agent';
 import { access, stat } from 'fs/promises';
 import { constants } from 'fs';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 
 export async function fetchWithProxy(url: string, options: any = {}, proxy: string | undefined) {
     if (proxy) {
-        options.agent = new HttpsProxyAgent(proxy);
+        options.agent = new SocksProxyAgent(proxy);
     }
     return fetch(url, options);
 }

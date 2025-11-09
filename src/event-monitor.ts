@@ -1,4 +1,4 @@
-import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from "socks-proxy-agent";
 import WebSocket from 'ws';
 import { fetchUpcomingEvents } from './polymarket';
 import { getConfig } from './config';
@@ -118,9 +118,9 @@ export class EventMonitor {
             let pinging = false;
 
             const createWS = () => {
-                const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+                const proxy = config.SOCKS_PROXY;
                 if (proxy) {
-                    return new WebSocket(wsUrl, { agent: new HttpsProxyAgent(proxy) as any });
+                    return new WebSocket(wsUrl, { agent: new SocksProxyAgent(proxy) as any });
                 } else {
                     return new WebSocket(wsUrl);
                 }
