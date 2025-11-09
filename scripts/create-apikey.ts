@@ -56,11 +56,11 @@ export async function createEnv(funderAddr: string, ownerPri: string, apikey: Ap
         CLOB_SECRET: encryptor.encrypt(apikey.secret),
         CLOB_PASS_PHRASE: encryptor.encrypt(apikey.passphrase),
 
-        CHAIN_RPC_URL: "https://polygon-rpc.com/",
-        USDC_ADDRESS: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
-        CTF_ADDRESS: "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
-        NEG_RISK_CTF_ADDRESS: "0xC5d563A36AE78145C45a50134d48A1215220f80a",
-        POLYMARKET_RELAYER_URL: "https://relayer-v2.polymarket.com/",
+        // CHAIN_RPC_URL: "https://polygon-rpc.com/",
+        // USDC_ADDRESS: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+        // CTF_ADDRESS: "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+        // NEG_RISK_CTF_ADDRESS: "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296",
+        // POLYMARKET_RELAYER_URL: "https://relayer-v2.polymarket.com/",
         BUILDER_API_KEY: encryptor.encrypt(builderApikey.key),
         BUILDER_SECRET: encryptor.encrypt(builderApikey.secret),
         BUILDER_PASS_PHRASE: encryptor.encrypt(builderApikey.passphrase)

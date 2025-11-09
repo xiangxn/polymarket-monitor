@@ -61,7 +61,7 @@ export const getConfig = () => {
         CHAIN_RPC_URL: process.env.CHAIN_RPC_URL || 'https://polygon-rpc.com',
         USDC_ADDRESS: process.env.USDC_ADDRESS || '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
         CTF_ADDRESS: process.env.CTF_ADDRESS || '0x4d97dcd97ec945f40cf65f87097ace5ea0476045',
-        NEG_RISK_CTF_ADDRESS: process.env.NEG_RISK_CTF_ADDRESS || '0xC5d563A36AE78145C45a50134d48A1215220f80a',
+        NEG_RISK_CTF_ADDRESS: process.env.NEG_RISK_CTF_ADDRESS || '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296',
         POLYMARKET_RELAYER_URL: process.env.POLYMARKET_RELAYER_URL || 'https://relayer-v2.polymarket.com/',
         BUILDER_API_KEY: encryptor!.decrypt(process.env.BUILDER_API_KEY || ''),
         BUILDER_SECRET: encryptor!.decrypt(process.env.BUILDER_SECRET || ''),

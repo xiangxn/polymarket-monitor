@@ -161,7 +161,7 @@ export class UserMonitor {
                 }
                 await sleep(5)
             } catch (err) {
-                console.error('checkRedeem error:', err)
+                console.error(`checkRedeem error: ${JSON.stringify(err)}`)
                 await sleep(5)
             }
         }

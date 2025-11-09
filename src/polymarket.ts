@@ -315,7 +315,7 @@ export async function redeem(client: RelayClient, collateralToken: string, condi
 
 export async function redeemNegRisk(client: RelayClient, conditionId: string, amounts: string[]) {
     const ams = amounts.map(a => ethers.utils.parseEther(a.toString()))
-    console.debug(`redeemNegRisk amounts: ${JSON.stringify(ams)} ${JSON.stringify(amounts)}`)
+    // console.debug(`redeemNegRisk amounts: ${JSON.stringify(ams)} ${JSON.stringify(amounts)}`)
     const redeemTx: SafeTransaction = {
         to: config.NEG_RISK_CTF_ADDRESS,
         operation: OperationType.Call,
