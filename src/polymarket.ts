@@ -283,7 +283,7 @@ export const CTF_INTERFACE = new Interface([
     "function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint[] indexSets)"
 ]);
 export const NEG_RISK_INTERFACE = new Interface([
-    "function redeemPositions(bytes32 _conditionId,uint256[] _amounts)"
+    "function redeemPositions(bytes32 _conditionId, uint256[] _amounts)"
 ])
 
 export const encodeRedeem = (collateralToken: string, conditionId: string): string => {
@@ -293,7 +293,7 @@ export const encodeRedeem = (collateralToken: string, conditionId: string): stri
     );
 }
 
-export const encodeRedeemNegRisk = (conditionId: string, amounts: ethers.BigNumber[]): string => {
+export const encodeRedeemNegRisk = (conditionId: string, amounts: string[]): string => {
     return NEG_RISK_INTERFACE.encodeFunctionData(
         "redeemPositions",
         [conditionId, amounts],
@@ -314,14 +314,14 @@ export async function redeem(client: RelayClient, collateralToken: string, condi
 }
 
 export async function redeemNegRisk(client: RelayClient, conditionId: string, amounts: string[]) {
-    const ams = amounts.map(a => ethers.utils.parseEther(a.toString()))
-    // console.debug(`redeemNegRisk amounts: ${JSON.stringify(ams)} ${JSON.stringify(amounts)}`)
+    const ams = amounts.map(a => ethers.utils.parseUnits(a.toString(), 6).toString())
     const redeemTx: SafeTransaction = {
         to: config.NEG_RISK_CTF_ADDRESS,
         operation: OperationType.Call,
         data: encodeRedeemNegRisk(conditionId, ams),
         value: "0"
     };
+    console.debug(`redeemNegRisk redeemTx: ${JSON.stringify(redeemTx)}`)
     const response = await client.execute([redeemTx], "Redeem position");
     console.debug(`redeemNegRisk response: ${JSON.stringify(response)}`)
     const result = await response.wait()
