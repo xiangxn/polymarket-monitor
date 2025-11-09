@@ -78,7 +78,7 @@ export async function fetchTokensBook(tokens: string[]) {
 export async function searchPositions(proxyWallet: string) {
     if (ethers.utils.isAddress(proxyWallet)) {
         try {
-            const url = `https://data-api.polymarket.com/positions?redeemable=true&limit=100&sortBy=TOKENS&sortDirection=DESC&user=${proxyWallet}`
+            const url = `https://data-api.polymarket.com/positions?redeemable=true&sizeThreshold=0&limit=100&sortBy=TOKENS&sortDirection=DESC&user=${proxyWallet}`
             const response = await fetchWithProxy(url, {}, config.HTTPS_PROXY);
             if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
             const data = await response.json() as any[];
@@ -90,7 +90,7 @@ export async function searchPositions(proxyWallet: string) {
     return []
 }
 
-export async function fetchUpcomingEvents(startTime: number = 0, endTime: number = 24, maxCount: number = 10000): Promise<PolymarketEvent[]> {
+export async function fetchUpcomingEvents(startTime: number = 0, endTime: number = 24, maxCount: number = 10000, closed: boolean = false): Promise<PolymarketEvent[]> {
     const now = new Date();
     const nowIso = (new Date(now.getTime() + startTime * 60 * 1000)).toISOString();
     const endDateMax = new Date(now.getTime() + endTime * 60 * 1000);
@@ -101,7 +101,7 @@ export async function fetchUpcomingEvents(startTime: number = 0, endTime: number
     const retryDelay = 20;
 
     while (true) {
-        const url = `https://gamma-api.polymarket.com/events?end_date_min=${nowIso}&end_date_max=${endDateMaxIso}&closed=false&offset=${offset}&limit=${limit}&order=endDate&ascending=true`;
+        const url = `https://gamma-api.polymarket.com/events?end_date_min=${nowIso}&end_date_max=${endDateMaxIso}&closed=${closed}&offset=${offset}&limit=${limit}&order=endDate&ascending=true`;
 
         try {
             const response = await fetchWithProxy(url, {}, config.HTTPS_PROXY);

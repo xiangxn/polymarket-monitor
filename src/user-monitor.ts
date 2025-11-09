@@ -144,7 +144,8 @@ export class UserMonitor {
     async checkRedeem() {
         while (this.running) {
             try {
-                const positions = await searchPositions(config.FUNDER_ADDRESS)
+                let positions = await searchPositions(config.FUNDER_ADDRESS)
+                positions = positions.filter(p => p.size > 0)
                 const chunks = chunkArray(positions, 3)
                 for (const chunk of chunks) {
                     await Promise.all(chunk.map(p => {

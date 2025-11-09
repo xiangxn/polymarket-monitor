@@ -6,7 +6,10 @@
     "test": "ts-node tests/test.ts",
     "build": "tsc",
     "start": "NODE_ENV=production node dist/src/main.js",
-    "encrypt-env": "ts-node src/utils/encrypt-env.ts"
+    "create:env": "ts-node scripts/create-apikey.ts",
+    "encrypt-env": "ts-node src/utils/encrypt-env.ts",
+    "create:apikey": "ts-node scripts/create-apikey.ts",
+    "create:builder-apikey": "ts-node scripts/create-builder-apikey.ts"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",
