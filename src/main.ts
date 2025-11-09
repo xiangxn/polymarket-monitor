@@ -1,8 +1,10 @@
 import Table from 'cli-table3';
 import UpdateManager from 'stdout-update';
 
-import dotenv from "dotenv"
-dotenv.config()
+import { config as dotenvConfig } from "dotenv";
+import { resolve } from "path";
+
+dotenvConfig({ path: resolve(__dirname, `../${process.env.ENV_FILE || ''}.env`) });
 
 import { initEncryptor } from "./config";
 initEncryptor()

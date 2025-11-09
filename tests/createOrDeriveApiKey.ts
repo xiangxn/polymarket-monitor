@@ -1,5 +1,7 @@
-import dotenv from "dotenv"
-dotenv.config()
+import { config as dotenvConfig } from "dotenv";
+import { resolve } from "path";
+
+dotenvConfig({ path: resolve(__dirname, "../.env") });
 
 import { initEncryptor } from "../src/config";
 initEncryptor()
