@@ -49,6 +49,7 @@ export async function createEnv(funderAddr: string, ownerPri: string, apikey: Ap
 
         MAX_ORDER_SIZE: 5,
         ENTER_WINDOW: "[0.85,0.95]",
+        MIN_END_TIME: 50,
 
         FUNDER_ADDRESS: funderAddr,
         OWNER_ADDRESS_PRI: encryptor.encrypt(ownerPri),
