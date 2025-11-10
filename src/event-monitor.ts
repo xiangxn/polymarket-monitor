@@ -1,10 +1,11 @@
 import { SocksProxyAgent } from "socks-proxy-agent";
 import WebSocket from 'ws';
-import { fetchUpcomingEvents } from './polymarket';
+import { fetchCryptoPrice, fetchUpcomingEvents, getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from './polymarket';
 import { getConfig } from './config';
 import { PolymarketEvent } from './types';
-import { sleep } from './helper';
+import { chunkArray, sleep } from './helper';
 import { eventBus } from './event-bus';
+import { get } from "http";
 
 const config = getConfig();
 /**
@@ -102,12 +103,34 @@ export class EventMonitor {
         // 如果全局停止，立即返回
         if (this.globalStopRequested) return;
 
-        // WS url 与订阅列表（按你原来逻辑）
+        // WS url 与订阅列表
         const wsUrl = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
         const assetIds = events.flatMap((e: any) => e.markets.flatMap((m: any) => m.tokens.map((t: any) => t.tokenId))).filter(Boolean);
         if (assetIds.length === 0) {
             console.info('No tokens to subscribe for this batch.');
             return;
+        }
+
+        // 根据slug获取对应event的开盘价(只会处理Crypto-price类型的event)
+        const chunks = chunkArray(events, 5)
+        for (const chunk of chunks) {
+            const results = await Promise.all(chunk.map(e => {
+                const symbol = getSymbol(e.tags)
+                if (!symbol) return new Promise(res => res(null))
+                const u = getTimeUnit(e.tags)
+                if (!u) return new Promise(res => res(null))
+                const unit = getSearchTimeUnit(u)
+                const startTime = getStartTime(u, e.endDate)
+                if (!startTime) return new Promise(res => res(null))
+                return fetchCryptoPrice(symbol, startTime, new Date(e.endDate), unit)
+            }))
+            chunk.forEach((e, i) => {
+                if (results[i] === null) {
+                    e.openPrice = 0
+                } else {
+                    e.openPrice = results[i] as number
+                }
+            })
         }
 
         // 指示器：当所有 events 都结束时 resolve

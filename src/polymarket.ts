@@ -1,6 +1,6 @@
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { fetchWithProxy, sleep } from "./helper";
-import { PolymarketEvent, PostOrderResult, Token } from "./types";
+import { CryptoPriceSymbol, CryptoPriceUint, PolymarketEvent, PostOrderResult, Token } from "./types";
 
 import { getConfig } from './config';
 import { SignatureType } from "@polymarket/order-utils";
@@ -78,7 +78,15 @@ export async function fetchTokensBook(tokens: string[]) {
 export async function searchPositions(proxyWallet: string) {
     if (ethers.utils.isAddress(proxyWallet)) {
         try {
-            const url = `https://data-api.polymarket.com/positions?redeemable=true&sizeThreshold=0&limit=100&sortBy=TOKENS&sortDirection=DESC&user=${proxyWallet}`
+            const params = new URLSearchParams({
+                redeemable: 'true',
+                sizeThreshold: '0',
+                limit: '100',
+                sortBy: 'TOKENS',
+                sortDirection: 'DESC',
+                user: proxyWallet
+            })
+            const url = `https://data-api.polymarket.com/positions?${params.toString()}`
             const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
             if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
             const data = await response.json() as any[];
@@ -90,7 +98,30 @@ export async function searchPositions(proxyWallet: string) {
     return []
 }
 
-export async function fetchUpcomingEvents(startTime: number = 0, endTime: number = 24, maxCount: number = 10000, closed: boolean = false): Promise<PolymarketEvent[]> {
+export async function fetchCryptoPrice(symbol: CryptoPriceSymbol, startTime: Date, endDate: Date, variant: CryptoPriceUint) {
+    // https://polymarket.com/api/crypto/crypto-price?symbol=BTC&eventStartTime=2025-11-09T14:00:00Z&variant=hourly&endDate=2025-11-09T15:00:00Z
+    // {"openPrice":102911.4,"closePrice":103037.9,"timestamp":1762766058529,"completed":true,"incomplete":false,"cached":false}
+
+    try {
+        const params = new URLSearchParams({
+            symbol,
+            eventStartTime: startTime.toISOString(),
+            endDate: endDate.toISOString(),
+            variant
+        })
+        const url = `https://polymarket.com/api/crypto/crypto-price?${params.toString()}`
+        const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
+        if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
+        const data = await response.json() as any;
+        return data.openPrice as number
+    } catch (e) {
+        console.error("searchPositions error:", e)
+    }
+    return null
+}
+
+export async function fetchUpcomingEvents(startTime: number = 0, endTime: number = 24, maxCount: number = 10000, closed: boolean = false, tagId?: number): Promise<PolymarketEvent[]> {
+    if (!tagId) tagId = 1312    // slug:crypto-prices, label:Crypto Prices
     const now = new Date();
     const nowIso = (new Date(now.getTime() + startTime * 60 * 1000)).toISOString();
     const endDateMax = new Date(now.getTime() + endTime * 60 * 1000);
@@ -101,7 +132,18 @@ export async function fetchUpcomingEvents(startTime: number = 0, endTime: number
     const retryDelay = 20;
 
     while (true) {
-        const url = `https://gamma-api.polymarket.com/events?end_date_min=${nowIso}&end_date_max=${endDateMaxIso}&closed=${closed}&offset=${offset}&limit=${limit}&order=endDate&ascending=true`;
+        const params = new URLSearchParams({
+            tag_id: tagId.toString(),
+            cyom: 'false',  // 只查询官方的事件
+            ascending: 'true',
+            end_date_min: nowIso,
+            end_date_max: endDateMaxIso,
+            closed: closed.toString(),
+            offset: offset.toString(),
+            limit: limit.toString(),
+            order: 'endDate',
+        });
+        const url = `https://gamma-api.polymarket.com/events?${params.toString()}`;
 
         try {
             const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
@@ -326,4 +368,77 @@ export async function redeemNegRisk(client: RelayClient, conditionId: string, am
     console.debug(`redeemNegRisk response: ${JSON.stringify(response)}`)
     const result = await response.wait()
     console.debug(`redeemNegRisk result: ${JSON.stringify(result)}`)
+}
+
+export function getStartTime(unit: string, endDate: string) {
+    let startDate = new Date(endDate)
+    switch (unit) {
+        case TIME_UNITS[0]:
+            startDate.setMinutes(startDate.getMinutes() - 15)
+            break;
+        case TIME_UNITS[1]:
+            startDate.setHours(startDate.getHours() - 1)
+            break;
+        case TIME_UNITS[2]:
+            startDate.setHours(startDate.getHours() - 4)
+            break;
+        case TIME_UNITS[3]:
+            startDate.setDate(startDate.getDate() - 1)
+            break;
+        case TIME_UNITS[4]:
+            startDate.setDate(startDate.getDate() - 7)
+            break;
+        case TIME_UNITS[5]:
+            startDate.setMonth(startDate.getMonth() - 1)
+            break;
+        default:
+            return null
+
+    }
+    return startDate
+}
+const TIME_UNITS = ['15m', 'hourly', '4h', 'daily', 'weekly', 'monthly']
+const TIME_UNIT_MAP: Record<string, string> = {
+    '15m': 'fifteen',
+    'hourly': 'hourly',
+    '4h': 'fourhour',
+    'daily': 'daily',
+    'weekly': 'weekly',
+    'monthly': 'monthly'
+}
+const SYMBOL_MAP: Record<string, string> = {
+    sol: 'SOL',
+    solana: 'SOL',
+    eth: 'ETH',
+    ethereum: 'ETH',
+    btc: 'BTC',
+    bitcoin: 'BTC',
+    xrp: 'XRP',
+    dogecoin: 'DOGE'
+}
+const SLUGS = Object.keys(SYMBOL_MAP)
+export function getSymbol(tags: any[]): CryptoPriceSymbol | null {
+    const slugs = tags.map(t => t.slug)
+    slugs.forEach(s => s.toLowerCase())
+    for (const slug of SLUGS) {
+        if (slugs.includes(slug)) {
+            return SYMBOL_MAP[slug] as CryptoPriceSymbol
+        }
+    }
+    return null
+}
+
+export function getSearchTimeUnit(unit: string): CryptoPriceUint {
+    return TIME_UNIT_MAP[unit] as CryptoPriceUint
+}
+
+export function getTimeUnit(tags: any[]) {
+    const slugs = tags.map(t => t.slug)
+    slugs.forEach(s => s.toLowerCase())
+    for (const unit of TIME_UNITS) {
+        if (slugs.includes(unit)) {
+            return unit
+        }
+    }
+    return null
 }

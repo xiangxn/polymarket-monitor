@@ -2,16 +2,19 @@ export interface PolymarketEvent {
     id: string;
     ticker: string | null;
     title: string | null;
-    startDate: string;
     endDate: string;
     active: boolean;
     closed: boolean;
     negRisk: boolean;
     volume: number;
+    seriesSlug: string;
     markets: PolymarketMarket[];
+    tags: any[],
 
     // 自定义字段
     tradeCount: number;
+    // 事件的开盘价，用于计算
+    openPrice: number;
 }
 
 export interface PolymarketMarket {
@@ -114,3 +117,6 @@ export interface OrderMessage {
     timestamp: string;
     type: string;
 }
+
+export type CryptoPriceSymbol = 'SOL' | 'BTC' | 'ETH' | 'XRP' | 'DOGE'
+export type CryptoPriceUint = 'fifteen' | 'hourly' | 'fourhour' | 'daily' | 'weekly' | 'monthly'
