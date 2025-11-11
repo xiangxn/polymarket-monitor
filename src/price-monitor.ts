@@ -100,8 +100,8 @@ export class PriceMonitor {
         };
 
         this.ws.onmessage = (raw) => {
-            console.log(`onmessage: ${JSON.stringify(raw.data)}`)
-            if (raw.data === 'PONG') return
+            // console.log(`onmessage: ${JSON.stringify(raw.data)}`)
+            if (raw.data === 'PONG' || raw.data === '') return
 
             try {
                 const data = JSON.parse(raw.data.toString())
