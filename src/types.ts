@@ -122,3 +122,12 @@ export interface OrderMessage {
 
 export type CryptoPriceSymbol = 'SOL' | 'BTC' | 'ETH' | 'XRP'
 export type CryptoPriceUint = 'fifteen' | 'hourly' | 'fourhour' | 'daily' | 'weekly' | 'monthly'
+
+
+export interface MetadataType {
+    market: string;
+    token: string;
+    outcome: string;
+    price: number;
+    size: number;
+}

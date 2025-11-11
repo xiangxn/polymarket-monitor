@@ -1,6 +1,6 @@
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { fetchWithProxy, sleep } from "./helper";
-import { CryptoPriceSymbol, CryptoPriceUint, PolymarketEvent, PostOrderResult, Token } from "./types";
+import { CryptoPriceSymbol, CryptoPriceUint, MetadataType, PolymarketEvent, PostOrderResult, Token } from "./types";
 
 import { getConfig } from './config';
 import { SignatureType } from "@polymarket/order-utils";
@@ -287,11 +287,11 @@ export class PolymarketClient {
         return resp
     }
 
-    async redeem(conditionId: string, negRisk: boolean, amounts?: string[]) {
+    async redeem(conditionId: string, negRisk: boolean, amounts?: string[], metadata?: MetadataType) {
         if (negRisk) {
-            await redeemNegRisk(this.relayer, conditionId, amounts!)
+            return await redeemNegRisk(this.relayer, conditionId, amounts!, metadata)
         } else {
-            await redeem(this.relayer, this.config.USDC_ADDRESS, conditionId)
+            return await redeem(this.relayer, this.config.USDC_ADDRESS, conditionId, metadata)
         }
     }
 
@@ -342,20 +342,21 @@ export const encodeRedeemNegRisk = (conditionId: string, amounts: string[]): str
     );
 }
 
-export async function redeem(client: RelayClient, collateralToken: string, conditionId: string) {
+export async function redeem(client: RelayClient, collateralToken: string, conditionId: string, metadata?: MetadataType) {
     const redeemTx: SafeTransaction = {
         to: config.CTF_ADDRESS,
         operation: OperationType.Call,
         data: encodeRedeem(collateralToken, conditionId),
         value: "0"
     };
-    const response = await client.execute([redeemTx], "Redeem position");
+    const response = await client.execute([redeemTx], JSON.stringify(metadata) ?? "Redeem position");
     console.debug(`redeem response: ${JSON.stringify(response)}`)
     const result = await response.wait()
     console.debug(`redeem result: ${JSON.stringify(result)}`)
+    return metadata
 }
 
-export async function redeemNegRisk(client: RelayClient, conditionId: string, amounts: string[]) {
+export async function redeemNegRisk(client: RelayClient, conditionId: string, amounts: string[], metadata?: MetadataType) {
     const ams = amounts.map(a => ethers.utils.parseUnits(a.toString(), 6).toString())
     const redeemTx: SafeTransaction = {
         to: config.NEG_RISK_CTF_ADDRESS,
@@ -364,10 +365,11 @@ export async function redeemNegRisk(client: RelayClient, conditionId: string, am
         value: "0"
     };
     console.debug(`redeemNegRisk redeemTx: ${JSON.stringify(redeemTx)}`)
-    const response = await client.execute([redeemTx], "Redeem position");
+    const response = await client.execute([redeemTx], JSON.stringify(metadata) ?? "Redeem position");
     console.debug(`redeemNegRisk response: ${JSON.stringify(response)}`)
     const result = await response.wait()
     console.debug(`redeemNegRisk result: ${JSON.stringify(result)}`)
+    return metadata
 }
 
 export function getStartTime(unit: string, endDate: string) {

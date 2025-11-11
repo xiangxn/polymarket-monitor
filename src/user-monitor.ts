@@ -5,6 +5,7 @@ import { chunkArray, sleep } from './helper';
 import { eventBus } from './event-bus';
 import { setCash } from './position';
 import { SocksProxyAgent } from 'socks-proxy-agent';
+import { MetadataType } from './types';
 
 const config = getConfig();
 
@@ -148,15 +149,23 @@ export class UserMonitor {
                 positions = positions.filter(p => p.size > 0)
                 const chunks = chunkArray(positions, 3)
                 for (const chunk of chunks) {
-                    await Promise.all(chunk.map(p => {
+                    const mds = await Promise.all(chunk.map(p => {
+                        const metadata: MetadataType = {
+                            market: p.conditionId,
+                            token: p.asset,
+                            outcome: p.outcome,
+                            price: p.avgPrice,
+                            size: p.size
+                        }
                         if (p.negativeRisk === false) {
-                            return this.client.redeem(p.conditionId, p.negativeRisk)
+                            return this.client.redeem(p.conditionId, p.negativeRisk, undefined, metadata)
                         } else {
                             const amounts = ["0", "0"]
                             amounts[parseInt(p.outcomeIndex)] = p.size
-                            return this.client.redeem(p.conditionId, p.negativeRisk, amounts)
+                            return this.client.redeem(p.conditionId, p.negativeRisk, amounts, metadata)
                         }
                     }))
+                    // TODO: 处理mds,获取市场数据判断盈亏,补充order csv
                     await sleep(1)
                 }
                 await sleep(20)
