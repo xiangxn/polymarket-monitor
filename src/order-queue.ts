@@ -27,11 +27,9 @@ export async function initOrderQueue() {
     if (!(await dirExists(dataDir))) {
         await fs.mkdir(dataDir, { recursive: true });
     }
-    const filePath = path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}.csv`);
-    if (!(await fileExists(filePath))) {
-        const headers = ['Market', 'Token', 'Outcome', 'OrderId', "Price", 'Size', 'Side', 'Timestamp']
-        await fs.writeFile(filePath, headers.join(",") + "\n", 'utf-8');
-    }
+    const filePath = getOrderFilePath();
+    await checkOrderFile(filePath)
+
     client = new PolymarketClient()
 }
 export function enqueueOrder(task: Omit<OrderTask, 'createdAt'>) {
@@ -159,8 +157,20 @@ async function fakeApiPlaceOrder(task: OrderTask) {
 async function saveOrder(order: OrderMessage) {
     if (!order) return
 
-    const filePath = path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}.csv`);
+    const filePath = getOrderFilePath();
+    await checkOrderFile(filePath)
     // ['Market', 'Token', 'Outcome', 'OrderId', "Price", 'Size', 'Side', 'Timestamp']
     const data = [order.market, order.asset_id, order.outcome, order.id, order.price, order.size_matched, order.side, order.timestamp]
     await fs.writeFile(filePath, data.join(",") + "\n", { flag: 'a', encoding: 'utf-8' });
+}
+
+function getOrderFilePath() {
+    return path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}.csv`);
+}
+
+async function checkOrderFile(filePath: string) {
+    if (!(await fileExists(filePath))) {
+        const headers = ['Market', 'Token', 'Outcome', 'OrderId', "Price", 'Size', 'Side', 'Timestamp']
+        await fs.writeFile(filePath, headers.join(",") + "\n", 'utf-8');
+    }
 }
