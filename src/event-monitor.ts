@@ -105,20 +105,17 @@ export class EventMonitor {
 
         // WS url 与订阅列表
         const wsUrl = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
-        const assetIds = events.flatMap((e: any) => e.markets.flatMap((m: any) => m.tokens.map((t: any) => t.tokenId))).filter(Boolean);
-        if (assetIds.length === 0) {
-            console.info('No tokens to subscribe for this batch.');
-            return;
-        }
+
 
         // 根据slug获取对应event的开盘价(只会处理Crypto-price类型的event)
         const chunks = chunkArray(events, 5)
         for (const chunk of chunks) {
             const results = await Promise.all(chunk.map(e => {
                 const symbol = getSymbol(e.tags)
-                if (!symbol) return new Promise(res => res(null))
+                if (!symbol) return new Promise(res => res(null))   // 如果没有找到对应的symbol，则返回null, 说明不是crypto-price类型的event
+                e.targetSymbol = symbol
                 const u = getTimeUnit(e.tags)
-                if (!u) return new Promise(res => res(null))
+                if (!u) return new Promise(res => res(null))    // 如果没有找到对应的unit, 则返回null, 说明还不支持这种时间单位
                 const unit = getSearchTimeUnit(u)
                 const startTime = getStartTime(u, e.endDate)
                 if (!startTime) return new Promise(res => res(null))
@@ -131,6 +128,16 @@ export class EventMonitor {
                     e.openPrice = results[i] as number
                 }
             })
+        }
+
+        // 过滤openPrice为0的event（⚠️暂时不过滤，在策略中分类处理）
+        // this.events = this.events.filter(e => e.openPrice > 0)
+
+        // 获取需要监听的token
+        const assetIds = events.flatMap((e: any) => e.markets.flatMap((m: any) => m.tokens.map((t: any) => t.tokenId))).filter(Boolean);
+        if (assetIds.length === 0) {
+            console.info('No tokens to subscribe for this batch.');
+            return;
         }
 
         // 指示器：当所有 events 都结束时 resolve

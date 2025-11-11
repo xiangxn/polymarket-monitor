@@ -18,6 +18,7 @@ import { getCash, getPositions, initPositions, savePositions } from './position'
 import { initOrderQueue } from './order-queue';
 
 import './strategy'; // 启动策略监听
+import { PriceMonitor } from './price-monitor';
 
 
 
@@ -27,9 +28,11 @@ async function main() {
 
     const monitor = new EventMonitor();
     const userMonitor = new UserMonitor();
+    const priceMonitor = new PriceMonitor();
 
     process.on('SIGINT', async () => {
         console.info('SIGINT received — shutting down gracefully...');
+        await priceMonitor.stop()
         await userMonitor.stop()
         await monitor.stop();
         await savePositions();
@@ -101,6 +104,7 @@ async function main() {
     await initPositions();
     await initOrderQueue();
     userMonitor.start();
+    priceMonitor.start();
     await monitor.start();
     clearInterval(interval);
     manager.unhook(false);

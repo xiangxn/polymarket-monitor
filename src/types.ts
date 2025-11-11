@@ -15,6 +15,8 @@ export interface PolymarketEvent {
     tradeCount: number;
     // 事件的开盘价，用于计算
     openPrice: number;
+    // 预测标的symbol
+    targetSymbol: CryptoPriceSymbol;
 }
 
 export interface PolymarketMarket {
@@ -118,5 +120,5 @@ export interface OrderMessage {
     type: string;
 }
 
-export type CryptoPriceSymbol = 'SOL' | 'BTC' | 'ETH' | 'XRP' | 'DOGE'
+export type CryptoPriceSymbol = 'SOL' | 'BTC' | 'ETH' | 'XRP'
 export type CryptoPriceUint = 'fifteen' | 'hourly' | 'fourhour' | 'daily' | 'weekly' | 'monthly'

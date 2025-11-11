@@ -9,7 +9,8 @@
     "create:env": "ts-node scripts/create-apikey.ts",
     "encrypt-env": "ts-node src/utils/encrypt-env.ts",
     "create:apikey": "ts-node scripts/create-apikey.ts",
-    "create:builder-apikey": "ts-node scripts/create-builder-apikey.ts"
+    "create:builder-apikey": "ts-node scripts/create-builder-apikey.ts",
+    "balance": "ts-node scripts/balances.ts"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",

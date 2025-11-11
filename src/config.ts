@@ -40,6 +40,7 @@ export const getConfig = () => {
         CLOB_PASS_PHRASE: encryptor!.decrypt(process.env.CLOB_PASS_PHRASE || ''),
 
         // 策略配置
+        RELATIVE_PRICE_CHANGE: parseFloat(process.env.RELATIVE_PRICE_CHANGE ?? "0.0005"),  // 价格相对变动幅度, 0.0005即幅度小于0.05%时不操作(幅度越小，不可预测性越强，风险越大)
         MIN_BALANCE: parseFloat(process.env.MIN_BALANCE ?? "140"),  // 最小余额，小于此值不操作
         MIN_END_TIME: parseFloat(process.env.MIN_END_TIME ?? "50") * 1000, // 只扫最后50秒钟的事件,单位s
         MIN_VOLUME: parseFloat(process.env.MIN_VOLUME ?? "1000"),  // 过滤事件最小交易量

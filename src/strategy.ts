@@ -3,6 +3,7 @@ import { PolymarketEvent } from './types';
 import { enqueueOrder } from './order-queue';
 import { getConfig } from './config';
 import { delPosition, getPositions, onPriceUpdate, getCash } from './position';
+import { getPrice } from './price-monitor';
 
 const config = getConfig()
 
@@ -102,12 +103,25 @@ function checkWindow(price: number): boolean {
 }
 
 async function checkSignal(event: PolymarketEvent) {
+    // 风控过滤
     const cash = getCash()
     if (cash <= config.MIN_BALANCE) {
         console.info(`[strategy] 到达止损位置, 不进行扫尾盘检查`)
         return
     }
+    // 时间窗口过滤
     if (new Date(event.endDate).getTime() - Date.now() > config.MIN_END_TIME) return
+
+    // 价格相对变动幅度过滤
+    if (event.openPrice > 0) {
+        const currentPrice = getPrice(event.targetSymbol)
+        const relativePriceChange = (currentPrice - event.openPrice) / event.openPrice
+        if (relativePriceChange < config.RELATIVE_PRICE_CHANGE) {
+            console.info(`[strategy] 价格相对变动幅度过小, 不进行扫尾盘检查: 当前价格: ${currentPrice}, 开盘价格: ${event.openPrice}, 相对变动幅度: ${relativePriceChange}`)
+            return
+        }
+    }
+
     if (event.negRisk) {
         // 互斥事件
         const markets = event.markets.filter(m => m.negRisk)    // 只取互斥事件的市场
