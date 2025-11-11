@@ -27,7 +27,7 @@ export async function sendAlert(message: string) {
         return;
     }
 
-    return bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).catch((err) => {
+    return bot.sendMessage(chatId, message, { parse_mode: 'HTML' }).catch((err) => {
         console.error('[Telegram] 发送失败：', err.message);
     });
 }
