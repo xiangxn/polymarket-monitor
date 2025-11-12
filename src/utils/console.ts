@@ -3,7 +3,8 @@ import fs from "fs"
 import { join } from "path"
 
 const config = {
-    debug: process.env.NODE_ENV === 'development'
+    debug: process.env.NODE_ENV === 'development',
+    suffix: process.env.ENV_FILE?.replace('../', '') ?? ''
 }
 
 const realStdoutFd = 1;
@@ -34,9 +35,9 @@ const LOG_DIR = join(__dirname, "../../logs");
 // 获取当前日期的日志文件名
 function getLogFilePath(level: string) {
     if (['ERROR', 'WARN'].includes(level.toUpperCase())) {
-        return join(LOG_DIR, `err-${new Date().toISOString().split('T')[0]}.log`);
+        return join(LOG_DIR, `err-${new Date().toISOString().split('T')[0]}-${config.suffix}.log`);
     } else {
-        return join(LOG_DIR, `log-${new Date().toISOString().split('T')[0]}.log`);
+        return join(LOG_DIR, `log-${new Date().toISOString().split('T')[0]}-${config.suffix}.log`);
     }
 }
 
