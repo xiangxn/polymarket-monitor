@@ -9,7 +9,7 @@ const positions: Map<string, Position> = new Map();
 
 const dataDir = path.join(process.cwd(), 'data');
 
-const posFileName = `positions-${process.env.ENV_FILE?.replace('../', '')}.json`
+const posFileName = `positions-${process.env.ENV_FILE?.replace('../', '') ?? ''}.json`
 
 let cash = 0
 
