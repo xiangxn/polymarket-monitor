@@ -9,7 +9,11 @@ const positions: Map<string, Position> = new Map();
 
 const dataDir = path.join(process.cwd(), 'data');
 
+const posFileName = `positions-${process.env.ENV_FILE?.replace('../', '')}.json`
+
 let cash = 0
+
+
 
 export function addCash(amount: number) {
     cash += Math.abs(amount)
@@ -43,7 +47,7 @@ export async function initPositions() {
     } catch (err) {
     }
     try {
-        const content = await fs.readFile(path.join(dataDir, 'positions.json'), 'utf-8');
+        const content = await fs.readFile(path.join(dataDir, `positions-${posFileName}.json`), 'utf-8');
         // 尝试解析 JSON,并加载到 positions 中
         const data = JSON.parse(content);
         if (Array.isArray(data)) {
@@ -54,9 +58,9 @@ export async function initPositions() {
     } catch (err: any) {
         // 如果文件不存在或 JSON 无效，则重置为空对象
         if (err.code === 'ENOENT') {
-            console.warn('[init] positions.json 不存在，已自动创建空文件。');
+            console.warn(`[init] positions-${posFileName}.json 不存在，已自动创建空文件。`);
         } else {
-            console.warn('[warn] positions.json 解析失败，已重置为空对象。');
+            console.warn(`[warn] positions-${posFileName}.json 解析失败，已重置为空对象。`);
         }
     }
     // 获取余额
@@ -113,5 +117,5 @@ export function subPosition(tokenId: string, size: number) {
 
 export async function savePositions() {
     const poss = Array.from(positions.values());
-    await fs.writeFile(path.join(dataDir, 'positions.json'), JSON.stringify(poss, null, 2));
+    await fs.writeFile(path.join(dataDir, `positions-${posFileName}.json`), JSON.stringify(poss, null, 2));
 }

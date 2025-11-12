@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { PolymarketClient, searchPositions } from './polymarket';
+import { fetchMarketBySlug, PolymarketClient, searchPositions } from './polymarket';
 import { getConfig } from './config';
 import { chunkArray, sleep } from './helper';
 import { eventBus } from './event-bus';
@@ -151,6 +151,7 @@ export class UserMonitor {
                 for (const chunk of chunks) {
                     const mds = await Promise.all(chunk.map(p => {
                         const metadata: MetadataType = {
+                            slug: p.slug,
                             market: p.conditionId,
                             token: p.asset,
                             outcome: p.outcome,
@@ -165,7 +166,8 @@ export class UserMonitor {
                             return this.client.redeem(p.conditionId, p.negativeRisk, amounts, metadata)
                         }
                     }))
-                    // TODO: 处理mds,获取市场数据判断盈亏,补充order csv
+                    // 处理mds,获取市场数据判断盈亏,补充order csv
+                    await Promise.all(mds.map(md => this.checkProfitLoss(md)))
                     await sleep(1)
                 }
                 await sleep(20)
@@ -175,6 +177,40 @@ export class UserMonitor {
             }
         }
         console.info('checkRedeem stopped')
+    }
+
+    async checkProfitLoss(md?: MetadataType) {
+        if (!md) return
+        const { slug, market, token, outcome, size } = md
+        let { price } = md
+        const m = await fetchMarketBySlug(slug)
+        if (m && m.outcomePrices) {
+            const outcomePrices = JSON.parse(m.outcomePrices)
+            const index = outcomePrices.findIndex((p: string) => p === '1')
+            const clobTokenIds = JSON.parse(m.clobTokenIds)
+            const outcomeToken = clobTokenIds[index]
+            if (outcomeToken === token) {
+                price = 1
+            } else {
+                price = 0
+            }
+            eventBus.emit('order', {
+                asset_id: token,
+                associate_trades: null,
+                event_type: 'order',
+                id: 0,
+                market: market,     //	condition ID of market
+                order_owner: '',    //	owner of order
+                original_size: size,//	original order size
+                outcome: outcome,
+                owner: '',  //	owner of orders
+                price: price,
+                side: 'SELL',   //	BUY/SELL
+                size_matched: size,    //	size of order that has been matched
+                timestamp: Date.now(),
+                type: "UPDATE"
+            })
+        }
     }
 
     async checkBalance() {

@@ -11,6 +11,7 @@ import { Side } from '@polymarket/clob-client';
 const ORDER_TIMEOUT_MS = 1000;
 const MAX_PENDING = 10;
 
+const orderFileSuffix = `${process.env.ENV_FILE?.replace('../', '')}`
 const orderQueue = new PQueue({ concurrency: 3 });
 const activeKeys = new Set<string>(); // 去重 key: marketId+type
 
@@ -165,7 +166,7 @@ async function saveOrder(order: OrderMessage) {
 }
 
 function getOrderFilePath() {
-    return path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}.csv`);
+    return path.join(dataDir, `orders-${new Date().toISOString().split('T')[0]}-${orderFileSuffix}.csv`);
 }
 
 async function checkOrderFile(filePath: string) {

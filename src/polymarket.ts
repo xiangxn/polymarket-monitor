@@ -75,6 +75,19 @@ export async function fetchTokensBook(tokens: string[]) {
     }
 }
 
+export async function fetchMarketBySlug(slug: string) {
+    const url = `https://gamma-api.polymarket.com/markets/slug/${slug}`
+    try {
+        const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
+        if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
+        const data = await response.json() as any;
+        return data
+    } catch (e) {
+        console.error("searchPositions error:", e)
+    }
+    return null
+}
+
 export async function searchPositions(proxyWallet: string) {
     if (ethers.utils.isAddress(proxyWallet)) {
         try {
