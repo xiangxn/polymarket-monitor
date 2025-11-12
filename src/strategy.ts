@@ -1,5 +1,5 @@
 import { eventBus } from './event-bus';
-import { PolymarketEvent } from './types';
+import { PolymarketEvent, Token } from './types';
 import { enqueueOrder } from './order-queue';
 import { getConfig } from './config';
 import { delPosition, getPositions, onPriceUpdate, getCash } from './position';
@@ -131,20 +131,20 @@ async function checkSignal(event: PolymarketEvent) {
         // 扫尾盘检查
         if (markets[0].tokens[0].ask.price - markets[1].tokens[0].ask.price > config.MIN_MARKET_SPREAD && checkWindow(markets[0].tokens[0].ask.price)) {
             // 可能存在扫尾盘机会
-            const size = Math.min(markets[0].tokens[0].ask.size * markets[0].tokens[0].ask.price, config.MAX_ORDER_SIZE)
-            if (size < config.MIN_ORDER_SIZE) return    // 平台不允许小于1usdc的单子
             const token = markets[0].tokens[0]
-            const lastBuys = token.lastBuy.filter(s => checkWindow(s.price) && Date.now() - s.time <= config.ENTER_DELAY)
-            if (lastBuys.length >= 2) {
+            const size = Math.min(token.ask.size * token.ask.price, config.MAX_ORDER_SIZE)
+            if (size < config.MIN_ORDER_SIZE) return    // size太小，不操作
+
+            if (checkBuy(token)) {
                 enqueueOrder({
                     type: 'buy',
                     eventId: event.id,
                     conditionId: markets[0].conditionId,
                     marketId: markets[0].id,
-                    tokenId: markets[0].tokens[0].tokenId,
+                    tokenId: token.tokenId,
                     amount: +size.toFixed(4),
-                    price: markets[0].tokens[0].ask.price,
-                    outcome: markets[0].tokens[0].outcome
+                    price: token.ask.price,
+                    outcome: token.outcome
                 })
             }
         }
@@ -156,11 +156,11 @@ async function checkSignal(event: PolymarketEvent) {
                 const index = spread > 0 ? 0 : 1
                 if (Math.abs(spread) > config.MIN_MARKET_SPREAD && checkWindow(m.tokens[index].ask.price)) {
                     // 可能存在扫尾盘机会
-                    const size = Math.min(m.tokens[index].ask.size * m.tokens[index].ask.price, config.MAX_ORDER_SIZE)
-                    if (size < config.MIN_ORDER_SIZE) return    // 平台不允许小于1usdc的单子
                     const token = m.tokens[index]
-                    const lastBuys = token.lastBuy.filter(s => checkWindow(s.price) && Date.now() - s.time <= config.ENTER_DELAY)
-                    if (lastBuys.length >= 2) {
+                    const size = Math.min(token.ask.size * token.ask.price, config.MAX_ORDER_SIZE)
+                    if (size < config.MIN_ORDER_SIZE) return    // size太小不操作
+
+                    if (checkBuy(token)) {
                         enqueueOrder({
                             type: 'buy',
                             eventId: event.id,
@@ -176,4 +176,17 @@ async function checkSignal(event: PolymarketEvent) {
             }
         })
     }
+}
+
+function checkBuy(token: Token) {
+    const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
+    if (vols.length === 0) return false   // 没有交易，不操作
+
+    const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
+    const lastBuys = token.lastBuy.filter(s => Date.now() - s.time <= config.ENTER_DELAY)
+    const totalBuyVol = lastBuys.reduce((a, b) => a + b.size, 0)  // 下单前ENTER_DELAY秒买单的总量
+
+    if (totalBuyVol < avgVol * config.ENTER_VOLUME_AVG_RATE) return false // 交易量太小，不操作
+    if (lastBuys.length < config.ENTER_TRADE_COUNT) return false  // 成交单太少，不操作
+    return true
 }

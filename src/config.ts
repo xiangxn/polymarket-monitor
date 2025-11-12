@@ -47,6 +47,8 @@ export const getConfig = () => {
         MIN_MARKET_SPREAD: parseFloat(process.env.MIN_MARKET_SPREAD ?? "0.2"),     // 市场价格差,如果是互斥市场就是市场间, 如果是二元市场就是市场内yes/no
         ENTER_WINDOW: JSON.parse(process.env.ENTER_WINDOW ?? "[0.72,0.95]"),         // 进入的价格窗口
         ENTER_DELAY: parseInt(process.env.ENTER_DELAY ?? "10") * 1000,                    // 进入延迟, ask价格达到后开始检查, 如果成交价满足进入窗口, 则进入, 单位秒
+        ENTER_VOLUME_AVG_RATE: parseFloat(process.env.ENTER_VOLUME_AVG_RATE ?? "0.2"),    // 进入时ENTER_DELAY时间内的买单量大于平均成交量的百分比，则进入
+        ENTER_TRADE_COUNT: parseInt(process.env.ENTER_TRADE_COUNT ?? "3"),                
         KEEP_LAST_TRADE_TIME: parseInt(process.env.KEEP_LAST_TRADE_TIME || '60'),       // 保留最近60s的交易数据
         STOP_LOSS_PERCENTAGE: parseFloat(process.env.STOP_LOSS_PERCENTAGE || '0.2'),   // 止损百分比
         STOP_LOSS_DELAY: parseInt(process.env.STOP_LOSS_DELAY || '5000'),               // 止损延迟时间, 单位ms, 比如5秒内有成交价低于止损价
