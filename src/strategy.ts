@@ -75,7 +75,7 @@ eventBus.on('batch_finished', async (events: PolymarketEvent[]) => {
             delPs.push(pos.tokenId)
             continue
         }
-        console.info(`[strategy] 尝试止盈: ${pos.tokenId}, 数量: ${pos.size}, 入场价格: ${pos.entryPrice}, 当前价格: ${pos.currentPrice}, 如果失败, 则在后面claim`)
+        // console.info(`[strategy] 尝试止盈: ${pos.tokenId}, 数量: ${pos.size}, 入场价格: ${pos.entryPrice}, 当前价格: ${pos.currentPrice}, 如果失败, 则在后面claim`)
         // 结束的事件不手动卖出，因为可能滑点
         // const market = event.markets.find(m => m.id === pos.marketId)!
         // const token = market.tokens.find(t => t.tokenId === pos.tokenId)!
@@ -181,12 +181,17 @@ async function checkSignal(event: PolymarketEvent) {
 }
 
 function checkBuy(token: Token) {
-    const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
+    const vols = [...token.lastBuy, ...token.lastSell]
     if (vols.length === 0) return false   // 没有交易，不操作
 
-    const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
+    const avgVol = vols.reduce((a, b) => a + b.size, 0) / vols.length    // 有效数据的平均成交量
     const lastBuys = token.lastBuy.filter(s => Date.now() - s.time <= config.ENTER_DELAY)
     const totalBuyVol = lastBuys.reduce((a, b) => a + b.size, 0)  // 下单前ENTER_DELAY秒买单的总量
+
+    const prices = vols.filter(t => Date.now() - t.time <= 5_000)
+    const avgPrice = prices.reduce((a, b) => a + b.price, 0) / prices.length    // 有效数据最新5秒的平均成交价
+
+    if ((token.price - avgPrice) / avgPrice < config.ENTER_DELTA_THRESHOLD) return false // 下跌跌幅大于ENTER_DELTA_THRESHOLD, 不下单. 因为此值为负, 所以是<. 默认值-0.005
 
     if (totalBuyVol < avgVol * config.ENTER_VOLUME_AVG_RATE) return false // 交易量太小，不操作
     if (lastBuys.length < config.ENTER_TRADE_COUNT) return false  // 成交单太少，不操作

@@ -49,6 +49,7 @@ export const getConfig = () => {
         ENTER_DELAY: parseInt(process.env.ENTER_DELAY ?? "10") * 1000,                    // 进入延迟, ask价格达到后开始检查, 如果成交价满足进入窗口, 则进入, 单位秒
         ENTER_VOLUME_AVG_RATE: parseFloat(process.env.ENTER_VOLUME_AVG_RATE ?? "0.2"),    // 进入时ENTER_DELAY时间内的买单量大于平均成交量的百分比，则进入
         ENTER_TRADE_COUNT: parseInt(process.env.ENTER_TRADE_COUNT ?? "3"),
+        ENTER_DELTA_THRESHOLD: parseFloat(process.env.ENTER_DELTA_THRESHOLD ?? "-0.005"),  // 如果下单时，价格是下跌状态，跌幅大于此值，不下单
         KEEP_LAST_TRADE_TIME: parseInt(process.env.KEEP_LAST_TRADE_TIME || '60'),       // 保留最近60s的交易数据
         STOP_LOSS_FLIP_LIMIT: parseFloat(process.env.STOP_LOSS_FLIP_LIMIT || '0.53'),   // 价格接近翻转时, 止损触发。不使用时可以设置为0
         STOP_LOSS_PERCENTAGE: parseFloat(process.env.STOP_LOSS_PERCENTAGE || '0.2'),   // 止损百分比
