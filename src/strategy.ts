@@ -17,6 +17,8 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                 return
             }
             if (token.bid.price < position.stopLoss) {  // 判断止损
+                if (token.price >= config.STOP_LOSS_FLIP_LIMIT) return  // 价格未超过止损翻转限制，不止损
+
                 const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
                 if (vols.length === 0) return
 
@@ -25,7 +27,7 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                 const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
                 const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前STOP_LOSS_DELAY秒卖单的总量
                 if (lastSells.length >= config.STOP_LOSS_TRADE_COUNT && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE && position.size >= 1) {
-                    console.info(`[strategy] 止损: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
+                    console.info(`[strategy] 止损: ${token.tokenId}, bid价格: ${token.bid.price}, trade价格: ${token.price}, 数量: ${position.size}`)
                     enqueueOrder({
                         type: 'sell',
                         conditionId: market.conditionId,

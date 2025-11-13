@@ -46,8 +46,8 @@ export interface Token {
     price: number;
     bid: Book;
     ask: Book;
-    lastBuy: { time: number, price: number, size: number }[];   // 只维护最近10s的数据
-    lastSell: { time: number, price: number, size: number }[];  // 只维护最近10s的数据
+    lastBuy: { time: number, price: number, size: number }[];   // 只维护最近10s的数据,成交买价历史
+    lastSell: { time: number, price: number, size: number }[];  // 只维护最近10s的数据，成交卖价历史
 }
 
 export interface Book {
