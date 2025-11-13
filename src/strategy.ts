@@ -195,5 +195,11 @@ function checkBuy(token: Token) {
 
     if (totalBuyVol < avgVol * config.ENTER_VOLUME_AVG_RATE) return false // 交易量太小，不操作
     if (lastBuys.length < config.ENTER_TRADE_COUNT) return false  // 成交单太少，不操作
+
+    console.debug(`[strategy] 扫尾盘检查: ${token.tokenId},
+                              最新成交价: ${token.price}, 最新Ask价${token.ask.price}, 最近5秒平均价: ${avgPrice}, 
+                              最近平均成交量: ${avgVol}, 最近5秒买单总量: ${totalBuyVol}`
+    )
+
     return true
 }
