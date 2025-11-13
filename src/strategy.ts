@@ -3,7 +3,7 @@ import { PolymarketEvent, Token } from './types';
 import { enqueueOrder } from './order-queue';
 import { getConfig } from './config';
 import { delPosition, getPositions, onPriceUpdate, getCash } from './position';
-import { getPrice } from './price-monitor';
+import { getExternalPrice } from './price-monitor';
 
 const config = getConfig()
 
@@ -75,7 +75,7 @@ eventBus.on('batch_finished', async (events: PolymarketEvent[]) => {
             delPs.push(pos.tokenId)
             continue
         }
-        console.info(`[strategy] 尝试止盈: ${pos.tokenId}, 数量: ${pos.size}, 如果失败, 则在后面claim`)
+        console.info(`[strategy] 尝试止盈: ${pos.tokenId}, 数量: ${pos.size}, 入场价格: ${pos.entryPrice}, 当前价格: ${pos.currentPrice}, 如果失败, 则在后面claim`)
         // 结束的事件不手动卖出，因为可能滑点
         // const market = event.markets.find(m => m.id === pos.marketId)!
         // const token = market.tokens.find(t => t.tokenId === pos.tokenId)!
@@ -116,7 +116,7 @@ async function checkSignal(event: PolymarketEvent) {
 
     // 价格相对变动幅度过滤
     if (event.openPrice > 0) {
-        const currentPrice = getPrice(event.targetSymbol)
+        const currentPrice = getExternalPrice(event.targetSymbol)
         const relativePriceChange = (currentPrice - event.openPrice) / event.openPrice
         if (relativePriceChange < config.RELATIVE_PRICE_CHANGE) {
             console.info(`[strategy] 价格相对变动幅度过小, 不进行扫尾盘检查: ${event.targetSymbol}, 当前价格: ${currentPrice}, 开盘价格: ${event.openPrice}, 相对变动幅度: ${relativePriceChange}`)

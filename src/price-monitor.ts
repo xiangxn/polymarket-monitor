@@ -7,8 +7,13 @@ const config = getConfig();
 
 const priceMap = new Map<string, number>()
 
-export const getPrice = (symbol: string) => {
-    return priceMap.get(symbol) ?? 0
+/**
+ *  根据symbol获取外部价格
+ * @param symbol 
+ * @returns 
+ */
+export const getExternalPrice = (symbol: string) => {
+    return priceMap.get(symbol.toUpperCase()) ?? 0
 }
 
 export class PriceMonitor {
@@ -107,7 +112,7 @@ export class PriceMonitor {
                 const data = JSON.parse(raw.data.toString())
                 if (data.payload && data.topic && data.topic === 'crypto_prices') {
                     const { symbol, price } = data.payload
-                    priceMap.set(symbol, price)
+                    priceMap.set(symbol.replace('usdt', '').toUpperCase(), price)
                 }
             } catch (err) {
                 console.error('Price WS onmessage parse error', err);
