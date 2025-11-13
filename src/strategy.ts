@@ -108,7 +108,7 @@ async function checkSignal(event: PolymarketEvent) {
     // 风控过滤
     const cash = getCash()
     if (cash <= config.MIN_BALANCE) {
-        console.info(`[strategy] 到达止损位置, 不进行扫尾盘检查`)
+        // console.info(`[strategy] 到达止损位置, 不进行扫尾盘检查`)
         return
     }
     // 时间窗口过滤
@@ -119,7 +119,7 @@ async function checkSignal(event: PolymarketEvent) {
         const currentPrice = getPrice(event.targetSymbol)
         const relativePriceChange = (currentPrice - event.openPrice) / event.openPrice
         if (relativePriceChange < config.RELATIVE_PRICE_CHANGE) {
-            console.info(`[strategy] 价格相对变动幅度过小, 不进行扫尾盘检查: 当前价格: ${currentPrice}, 开盘价格: ${event.openPrice}, 相对变动幅度: ${relativePriceChange}`)
+            console.info(`[strategy] 价格相对变动幅度过小, 不进行扫尾盘检查: ${event.targetSymbol}, 当前价格: ${currentPrice}, 开盘价格: ${event.openPrice}, 相对变动幅度: ${relativePriceChange}`)
             return
         }
     }
