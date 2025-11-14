@@ -100,6 +100,7 @@ export async function searchPositions(proxyWallet: string) {
                 user: proxyWallet
             })
             const url = `https://data-api.polymarket.com/positions?${params.toString()}`
+            console.debug(`searchPositions url: ${url}`)
             const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
             if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
             const data = await response.json() as any[];
