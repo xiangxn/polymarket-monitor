@@ -117,7 +117,7 @@ export class EventMonitor {
                 const u = getTimeUnit(e.tags)
                 if (!u) return new Promise(res => res(null))    // 如果没有找到对应的unit, 则返回null, 说明还不支持这种时间单位
                 const unit = getSearchTimeUnit(u)
-                const startTime = getStartTime(u, e.endDate)
+                const startTime = getStartTime(unit, e.endDate)
                 if (!startTime) return new Promise(res => res(null))
                 return fetchCryptoPrice(symbol, startTime, new Date(e.endDate), unit)
             }))

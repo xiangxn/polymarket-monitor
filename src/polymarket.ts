@@ -1,6 +1,6 @@
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { fetchWithProxy, sleep } from "./helper";
-import { CryptoPriceSymbol, CryptoPriceUint, MetadataType, PolymarketEvent, PostOrderResult, Token } from "./types";
+import { CryptoPriceSymbol, CryptoPriceUint, MetadataType, PolymarketEvent, PolymarketMarket, PostOrderResult, Token } from "./types";
 
 import { getConfig } from './config';
 import { SignatureType } from "@polymarket/order-utils";
@@ -23,15 +23,11 @@ export function convertTokens(market: any) {
     if (typeof market.outcomes === 'string') {
         market.outcomes = JSON.parse(market.outcomes)
     }
-    if (typeof market.outcomePrices === 'string') {
-        market.outcomePrices = JSON.parse(market.outcomePrices)
-    }
     for (let i = 0; i < market.clobTokenIds.length; i++) {
-        const price = parseFloat(market.outcomePrices[i]?.toString() ?? "0")
         tokens.push({
             tokenId: market.clobTokenIds[i],
             outcome: market.outcomes[i],
-            price: price,
+            price: 0,
             bid: {
                 price: 0,
                 size: 0
@@ -45,13 +41,6 @@ export function convertTokens(market: any) {
         })
     }
     return tokens
-}
-
-export function calcTotalPrice(outcomePrices: string | string[]): number {
-    if (typeof outcomePrices === 'string') {
-        outcomePrices = JSON.parse(outcomePrices)
-    }
-    return (outcomePrices as string[]).reduce((a: any, b: any) => parseFloat(a) + parseFloat(b), 0)
 }
 
 export async function fetchTokensBook(tokens: string[]) {
@@ -124,12 +113,32 @@ export async function fetchCryptoPrice(symbol: CryptoPriceSymbol, startTime: Dat
             variant
         })
         const url = `https://polymarket.com/api/crypto/crypto-price?${params.toString()}`
+        console.debug(`fetchCryptoPrice url: ${url}`)
         const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
         if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
         const data = await response.json() as any;
-        return data.openPrice as number
+        return (data.openPrice ?? 0) as number
     } catch (e) {
         console.error("searchPositions error:", e)
+    }
+    return null
+}
+
+export async function fetchMarketByCId(conditionId: string) {
+    const url = `https://gamma-api.polymarket.com/markets?condition_ids=${conditionId}`
+    try {
+        const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
+        if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
+        const data = await response.json() as any[];
+        if (data.length > 0 && data[0].cyom === false) {    // 只查询官方的市场
+            const market = data[0] as PolymarketMarket
+            market.clobTokenIds = (typeof market.clobTokenIds === 'string') ? JSON.parse(market.clobTokenIds) : market.clobTokenIds;
+            market.outcomes = (typeof market.outcomes === 'string') ? JSON.parse(market.outcomes) : market.outcomes;
+            market.tokens = convertTokens(market)
+            return market
+        }
+    } catch (e) {
+        console.error("fetchMarketByCId error:", e)
     }
     return null
 }
@@ -176,9 +185,7 @@ export async function fetchUpcomingEvents(startTime: number = 0, endTime: number
                 e.markets.forEach(m => {
                     m.clobTokenIds = (typeof m.clobTokenIds === 'string') ? JSON.parse(m.clobTokenIds) : m.clobTokenIds;
                     m.outcomes = (typeof m.outcomes === 'string') ? JSON.parse(m.outcomes) : m.outcomes;
-                    m.outcomePrices = (typeof m.outcomePrices === 'string') ? JSON.parse(m.outcomePrices) : m.outcomePrices;
                     m.tokens = convertTokens(m);
-                    m.totalPrice = calcTotalPrice(m.outcomePrices);
                 });
             });
 
@@ -388,23 +395,25 @@ export async function redeemNegRisk(client: RelayClient, conditionId: string, am
 
 export function getStartTime(unit: string, endDate: string) {
     let startDate = new Date(endDate)
+    const units = Object.values(TIME_UNIT_MAP)
+    console.log(`getStartTime: ${unit}, ${endDate}, ${units}`)
     switch (unit) {
-        case TIME_UNITS[0]:
+        case units[0]:
             startDate.setMinutes(startDate.getMinutes() - 15)
             break;
-        case TIME_UNITS[1]:
+        case units[1]:
             startDate.setHours(startDate.getHours() - 1)
             break;
-        case TIME_UNITS[2]:
+        case units[2]:
             startDate.setHours(startDate.getHours() - 4)
             break;
-        case TIME_UNITS[3]:
+        case units[3]:
             startDate.setDate(startDate.getDate() - 1)
             break;
-        case TIME_UNITS[4]:
+        case units[4]:
             startDate.setDate(startDate.getDate() - 7)
             break;
-        case TIME_UNITS[5]:
+        case units[5]:
             startDate.setMonth(startDate.getMonth() - 1)
             break;
         default:
@@ -444,6 +453,11 @@ export function getSymbol(tags: any[]): CryptoPriceSymbol | null {
     return null
 }
 
+export function isCryptoPrices(tags: any[]) {
+    const index = tags.findIndex(t => t.id === '1312')
+    return index > -1
+}
+
 export function getSearchTimeUnit(unit: string): CryptoPriceUint {
     return TIME_UNIT_MAP[unit] as CryptoPriceUint
 }
@@ -458,3 +472,17 @@ export function getTimeUnit(tags: any[]) {
     }
     return null
 }
+
+export function getSymbolBySlug(slug: string) {
+    const arr = slug.split('-')
+    if (arr.length > 1) {
+        return SYMBOL_MAP[arr[0]] as CryptoPriceSymbol
+    }
+    return null
+}
+
+export function getUnitBySeriesSlug(slug: string) {
+    const arr = slug.split('-')
+    return TIME_UNIT_MAP[arr[arr.length - 1]] as CryptoPriceUint
+}
+

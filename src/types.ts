@@ -24,8 +24,7 @@ export interface PolymarketMarket {
     conditionId: string;
     clobTokenIds: string[];
     outcomes: string[];  // e.g. [Yes, No],[Up, Down]
-    outcomePrices: string[];
-    question: string;
+    slug: string;
     endDate: string;
     negRisk: boolean;
     volume: number;
@@ -34,10 +33,8 @@ export interface PolymarketMarket {
     // 重要数据
     tokens: Token[];
     liquidityNum: number;
-    totalPrice: number;
-    // 调用需要
-    orderPriceMinTickSize: number;
-    orderMinSize: number;
+    // 事件标的的开盘价，用于计算
+    openPrice: number;
 }
 
 export interface Token {
