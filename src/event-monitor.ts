@@ -5,7 +5,6 @@ import { getConfig } from './config';
 import { PolymarketEvent } from './types';
 import { chunkArray, sleep } from './helper';
 import { eventBus } from './event-bus';
-import { get } from "http";
 
 const config = getConfig();
 /**

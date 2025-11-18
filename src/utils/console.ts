@@ -64,7 +64,7 @@ async function writeToFile(level: string, message: string) {
 
 function getCurrentTimestamp(name: string): string {
     const now = new Date();
-    return `[${now.toISOString().replace("T", " ").slice(0, 19)} ${name}]`; // YYYY-MM-DD HH:mm:ss
+    return `[${now.toISOString()} ${name}]`; // YYYY-MM-DD HH:mm:ss
 }
 
 console.error = (...args) => {

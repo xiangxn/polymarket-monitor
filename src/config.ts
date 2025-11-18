@@ -73,3 +73,5 @@ export const getConfig = () => {
         BUILDER_PASS_PHRASE: encryptor!.decrypt(process.env.BUILDER_PASS_PHRASE || ''),
     }
 }
+
+export type ConfigType = ReturnType<typeof getConfig>;

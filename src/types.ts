@@ -1,3 +1,5 @@
+import { computeReturns, std } from "./utils/math";
+
 export interface PolymarketEvent {
     id: string;
     ticker: string | null;
@@ -9,7 +11,7 @@ export interface PolymarketEvent {
     volume: number;
     seriesSlug: string;
     markets: PolymarketMarket[];
-    tags: any[],
+    tags: any[];
 
     // 自定义字段
     tradeCount: number;
@@ -30,11 +32,11 @@ export interface PolymarketMarket {
     volume: number;
     active: boolean;
     closed: boolean;
-    // 重要数据
+    eventStartTime: string;
+    tags: any[];
+    // index=0 为Yes[UP], index=1 为No[DOWN]
     tokens: Token[];
     liquidityNum: number;
-    // 事件标的的开盘价，用于计算
-    openPrice: number;
 }
 
 export interface Token {
@@ -128,4 +130,43 @@ export interface MetadataType {
     outcome: string;
     price: number;
     size: number;
+}
+
+export interface BestPrice { bestBuy: number, bestSell: number }
+
+export type PPoint = { ts: number; price: number; };
+export class SlidingWindow {
+    private arr: PPoint[] = [];
+    private lastPPoint: PPoint = { ts: 0, price: 0 }
+    private ms = 10_000;
+
+    constructor(ms?: number) {
+        if (ms) {
+            this.ms = ms
+        }
+    }
+
+    push(p: PPoint) {
+        if (p.ts - this.lastPPoint.ts > 1000 || p.price !== this.lastPPoint.price) {
+            this.arr.push(p)
+            this.lastPPoint = p
+            this.pruneOlderThan(this.ms)
+        }
+    }
+    private pruneOlderThan(ms: number) {
+        const now = Date.now();
+        while (this.arr.length && now - this.arr[0].ts > ms) this.arr.shift();
+    }
+    avg(): number | null {
+        if (this.arr.length === 0) return null;
+        return this.arr.reduce((s, x) => s + x.price, 0) / this.arr.length;
+    }
+    last(): number | null {
+        if (!this.arr.length) return null;
+        return this.arr[this.arr.length - 1].price;
+    }
+    std(): number | null {
+        if (this.arr.length === 0) return null;
+        return std(computeReturns(this.arr.map(p => p.price)))
+    }
 }

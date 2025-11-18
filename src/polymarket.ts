@@ -72,7 +72,7 @@ export async function fetchMarketBySlug(slug: string) {
         const data = await response.json() as any;
         return data
     } catch (e) {
-        console.error("searchPositions error:", e)
+        console.error("fetchMarketBySlug error:", e)
     }
     return null
 }
@@ -101,31 +101,37 @@ export async function searchPositions(proxyWallet: string) {
     return []
 }
 
-export async function fetchCryptoPrice(symbol: CryptoPriceSymbol, startTime: Date, endDate: Date, variant: CryptoPriceUint) {
+export async function fetchCryptoPrice(symbol: CryptoPriceSymbol, startTime: Date, endDate: Date, variant: CryptoPriceUint, retries = 3, retryDelay = 2) {
     // https://polymarket.com/api/crypto/crypto-price?symbol=BTC&eventStartTime=2025-11-09T14:00:00Z&variant=hourly&endDate=2025-11-09T15:00:00Z
     // {"openPrice":102911.4,"closePrice":103037.9,"timestamp":1762766058529,"completed":true,"incomplete":false,"cached":false}
+    let url = ""
+    const params = new URLSearchParams({
+        symbol,
+        eventStartTime: startTime.toISOString(),
+        endDate: endDate.toISOString(),
+        variant
+    })
+    url = `https://polymarket.com/api/crypto/crypto-price?${params.toString()}`
 
-    try {
-        const params = new URLSearchParams({
-            symbol,
-            eventStartTime: startTime.toISOString(),
-            endDate: endDate.toISOString(),
-            variant
-        })
-        const url = `https://polymarket.com/api/crypto/crypto-price?${params.toString()}`
-        console.debug(`fetchCryptoPrice url: ${url}`)
-        const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
-        if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
-        const data = await response.json() as any;
-        return (data.openPrice ?? 0) as number
-    } catch (e) {
-        console.error("searchPositions error:", e)
+    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+        try {
+            const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
+            if (!response.ok) throw new Error(`Bad status: ${response.status}`);
+            const data = await response.json() as any;
+            return (data.openPrice ?? 0) as number
+        } catch (e) {
+            console.error("fetchCryptoPrice error:", e, url)
+            if (attempt > retries) break;
+
+            const delay = retryDelay * 2 ** (attempt - 1);
+            await sleep(delay);
+        }
     }
     return null
 }
 
 export async function fetchMarketByCId(conditionId: string) {
-    const url = `https://gamma-api.polymarket.com/markets?condition_ids=${conditionId}`
+    const url = `https://gamma-api.polymarket.com/markets?condition_ids=${conditionId}&include_tag=true`
     try {
         const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
         if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
@@ -139,6 +145,57 @@ export async function fetchMarketByCId(conditionId: string) {
         }
     } catch (e) {
         console.error("fetchMarketByCId error:", e)
+    }
+    return null
+}
+
+export async function searchMarkets(endDateMin: Date, endDateMax: Date, slugs?: string[]) {
+    const params = new URLSearchParams({
+        end_date_min: endDateMin.toISOString(),
+        end_date_max: endDateMax.toISOString(),
+        order: 'eventStartTime',
+        ascending: 'true',
+        include_tag: 'true',
+        limit: '100',
+        cyom: 'false',  // 只查询官方的市场
+        closed: 'false'
+    })
+    if (slugs && slugs.length > 0) {
+        slugs.forEach(s => params.append('slug', s))
+    }
+    const url = `https://gamma-api.polymarket.com/markets?${params.toString()}`
+    console.debug(`searchMarkets url: ${url}`)
+    try {
+        const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
+        if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
+        const data = await response.json() as any[];
+        if (data && data.length > 0) {
+            console.debug(`searchMarkets count: ${data.length}`)
+            return data.map(m => {
+                const market = m as PolymarketMarket
+                market.clobTokenIds = (typeof market.clobTokenIds === 'string') ? JSON.parse(market.clobTokenIds) : market.clobTokenIds;
+                market.outcomes = (typeof market.outcomes === 'string') ? JSON.parse(market.outcomes) : market.outcomes;
+                market.tokens = convertTokens(market)
+                return market
+            })
+        }
+    } catch (e) {
+        console.error("searchMarkets error:", e)
+    }
+    return null
+}
+
+export async function fetchMarketTagsById(marketId: number | string) {
+    try {
+        if (typeof marketId === 'string') {
+            marketId = parseInt(marketId)
+        }
+        const url = `https://gamma-api.polymarket.com/markets/${marketId}/tags`
+        const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
+        if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
+        return await response.json() as any[]
+    } catch (e) {
+        console.error("fetchMarketTagsById error:", e)
     }
     return null
 }
@@ -396,7 +453,7 @@ export async function redeemNegRisk(client: RelayClient, conditionId: string, am
 export function getStartTime(unit: string, endDate: string) {
     let startDate = new Date(endDate)
     const units = Object.values(TIME_UNIT_MAP)
-    console.log(`getStartTime: ${unit}, ${endDate}, ${units}`)
+    // console.debug(`getStartTime: ${unit}, ${endDate}, ${units}`)
     switch (unit) {
         case units[0]:
             startDate.setMinutes(startDate.getMinutes() - 15)
@@ -422,10 +479,11 @@ export function getStartTime(unit: string, endDate: string) {
     }
     return startDate
 }
-const TIME_UNITS = ['15m', 'hourly', '4h', 'daily', 'weekly', 'monthly']
+const TIME_UNITS = ['15m', 'hourly', '4h', 'daily', 'weekly', 'monthly', '1h']
 const TIME_UNIT_MAP: Record<string, string> = {
     '15m': 'fifteen',
     'hourly': 'hourly',
+    '1h': 'hourly',
     '4h': 'fourhour',
     'daily': 'daily',
     'weekly': 'weekly',
@@ -463,8 +521,8 @@ export function getSearchTimeUnit(unit: string): CryptoPriceUint {
 }
 
 export function getTimeUnit(tags: any[]) {
-    const slugs = tags.map(t => t.slug)
-    slugs.forEach(s => s.toLowerCase())
+    let slugs = tags.map(t => t.slug)
+    slugs = slugs.map(s => s.toLowerCase())
     for (const unit of TIME_UNITS) {
         if (slugs.includes(unit)) {
             return unit

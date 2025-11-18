@@ -1,11 +1,12 @@
 {
-  "name": "monitor",
+  "name": "polymarket-bot",
   "packageManager": "yarn@4.10.3",
   "scripts": {
-    "dev": "NODE_ENV=development ts-node src/main.ts",
+    "dev": "NODE_ENV=development ts-node src/fifteen.ts",
     "test": "ts-node tests/test.ts",
     "build": "tsc",
     "start": "NODE_ENV=production node dist/src/main.js",
+    "start:fifteen": "NODE_ENV=development node dist/src/fifteen.js",
     "create:env": "ts-node scripts/create-apikey.ts",
     "encrypt-env": "ts-node src/utils/encrypt-env.ts",
     "create:apikey": "ts-node scripts/create-apikey.ts",
