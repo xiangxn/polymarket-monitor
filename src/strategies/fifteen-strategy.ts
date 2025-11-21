@@ -22,13 +22,14 @@ import { fetchCryptoPrice, getSearchTimeUnit, getStartTime, getSymbol, getTimeUn
 import { CryptoPriceSymbol, PolymarketMarket, SlidingWindow } from '../types';
 
 const ENTRY_WINDOW_LOW = 60; // seconds
-const ENTRY_WINDOW_HIGH = 13 * 60; // seconds
+const ENTRY_WINDOW_HIGH = 14 * 60; // seconds
 const TREND_THRESHOLD = 0.0006; // 0.06% -> 0.0006
 const MIN_PRICE_DELTA_THRESHOLD = 0.0015; // 0.15%
 const MAX_PRICE_DELTA_THRESHOLD = 0.0035; // 0.35%
 const MAX_ENTRY_PRICE = 0.68
 const MAX_BOOK_DIFF = 0.25
 const VOLATILITY_MARGIN = 1.0
+const DATA_JITTER_DELAY = 30
 
 /**
  * binance价格
@@ -84,6 +85,7 @@ eventBus.on(EVENT_KEY_BN_PRICE, ({ symbol, price, volume, time }: { symbol: stri
  */
 async function checkSignal(market: PolymarketMarket) {
     const timeLeft = secondsLeft(market.endDate);
+    console.log('timeLeft:', timeLeft)
     // 时间窗口内入场
     if (timeLeft > ENTRY_WINDOW_HIGH || timeLeft < ENTRY_WINDOW_LOW) return
 
@@ -101,6 +103,7 @@ async function checkSignal(market: PolymarketMarket) {
     const avg10 = win10.avg();
     // 30秒算术平均价格
     const avg30 = win30.avg();
+    console.log('symbol:', symbol, 'avg10:', avg10, 'avg30:', avg30, 'openPrice:', openPrice, 'nowPrice:', nowPrice, 'yesPrice:', yesPrice, 'noPrice:', noPrice)
     if (!avg10 || !avg30) return;
 
     // 方向信号
@@ -114,18 +117,24 @@ async function checkSignal(market: PolymarketMarket) {
     // 对数收益标准差
     const volatility_10s = win10.std()
     const volatility_30s = win30.std()
+    console.log('volatility_10s:', volatility_10s, 'volatility_30s:', volatility_30s, 'trendScore:', trendScore, 'vol:', vol)
     if (!volatility_10s || !volatility_30s) return;
 
     // 盘口差
     const bookDiff = Math.abs(yesPrice - noPrice)
+    console.log('bookDiff:', bookDiff)
     if (bookDiff > MAX_BOOK_DIFF) return
 
-
+    console.log('trendScore >= TREND_THRESHOLD:', trendScore >= TREND_THRESHOLD,
+        '\n(vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD):', (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD),
+        '\n(p_now > p_open && p_now > avg10 && avg10 >= avg30):', (p_now > p_open && p_now > avg10 && avg10 >= avg30),
+        '\nvolatility_10s > VOLATILITY_MARGIN * volatility_30s:', volatility_10s > VOLATILITY_MARGIN * volatility_30s
+    )
     // BUY UP condition
     if (trendScore >= TREND_THRESHOLD && (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD) && (p_now > p_open && p_now > avg10 && avg10 >= avg30) && volatility_10s > VOLATILITY_MARGIN * volatility_30s) {
         if (!yesPrice || yesPrice > MAX_ENTRY_PRICE) return
 
-        console.log("=== DECISION: BUY UP", { timeLeft, trendScore, p_now, p_open, vol, yesPrice, noPrice, avg10, avg30, volatility_10s, volatility_30s });
+        console.warn("=== DECISION: BUY UP", JSON.stringify({ timeLeft, trendScore, p_now, p_open, vol, yesPrice, noPrice, avg10, avg30, volatility_10s, volatility_30s }));
         // place order via Polymarket CLOB REST / relayer (not included here). This demo only logs decision.
     }
 
@@ -133,7 +142,7 @@ async function checkSignal(market: PolymarketMarket) {
     if (trendScore <= -TREND_THRESHOLD && (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD) && (p_now < p_open && p_now < avg10 && avg10 <= avg30) && volatility_10s > VOLATILITY_MARGIN * volatility_30s) {
         if (!noPrice || noPrice > MAX_ENTRY_PRICE) return
 
-        console.log("=== DECISION: BUY DOWN", { timeLeft, trendScore, p_now, p_open, vol, yesPrice, noPrice, avg10, avg30, volatility_10s, volatility_30s });
+        console.warn("=== DECISION: BUY DOWN", JSON.stringify({ timeLeft, trendScore, p_now, p_open, vol, yesPrice, noPrice, avg10, avg30, volatility_10s, volatility_30s }));
         // place order...
     }
 }
@@ -188,7 +197,7 @@ function onUpdateMarket(market: PolymarketMarket) {
 
     const win30 = win30Map.get(symbol)
     if (!win30) return
-    
+
     // 防抖处理
     let item = calcState.get(market.conditionId);
     if (!item) {
@@ -201,7 +210,7 @@ function onUpdateMarket(market: PolymarketMarket) {
     setTimeout(() => {
         item.scheduled = false;
         checkSignal(market)
-    }, 50);
+    }, DATA_JITTER_DELAY);
 }
 
 

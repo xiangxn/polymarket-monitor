@@ -201,8 +201,8 @@ export class MarketMonitor extends EventEmitter {
         this.polyliveWS.onerror = (err) => { console.error(`PolyLive WS error: ${JSON.stringify(err.message)}`) };
 
         this.polyliveWS.onmessage = (raw) => {
-            this.lastMsgTime = Date.now()
             if (raw.data === 'PONG' || raw.data === '') return
+            this.lastMsgTime = Date.now()
             this.emit(EVENT_KEY_POLYLIVE_PRICES, raw.data.toString())
         }
     }
