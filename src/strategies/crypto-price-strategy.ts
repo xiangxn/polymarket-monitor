@@ -127,7 +127,7 @@ export class CryptoPriceStrategy {
             trendScore: ${trendScore}, vol: ${vol}, bookDiff: ${bestYesBid - bestNoAsk}, ${bestNoBid - bestYesAsk}
             trendScore >= TREND_THRESHOLD[${this.config.TREND_THRESHOLD}]: ${trendScore >= this.config.TREND_THRESHOLD},${trendScore <= -this.config.TREND_THRESHOLD}
             (vol >= MIN_PRICE_DELTA_THRESHOLD[${this.config.MIN_PRICE_DELTA_THRESHOLD}] && vol <= MAX_PRICE_DELTA_THRESHOLD[${this.config.MAX_PRICE_DELTA_THRESHOLD}]): ${(vol >= this.config.MIN_PRICE_DELTA_THRESHOLD && vol <= this.config.MAX_PRICE_DELTA_THRESHOLD)}
-            (p_now >= p_open && p_now >= avg10 && avg10 >= avg30): ${(p_now >= p_open && p_now >= avg10 && avg10 >= avg30)}, ${(p_now < p_open && p_now < avg10 && avg10 < avg30)}
+            (p_now >= p_open && p_now >= avg10 && avg10 >= avg30): ${(p_now >= p_open && p_now >= avg10 && avg10 >= avg30)}, ${(p_now < p_open && p_now <= avg10 && avg10 <= avg30)}
             volatility_10s > VOLATILITY_MARGIN[${this.config.VOLATILITY_MARGIN}] * volatility_30s: ${volatility_10s > this.config.VOLATILITY_MARGIN * volatility_30s}`)
 
         // BUY UP condition
