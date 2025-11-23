@@ -21,3 +21,9 @@ export function std(arr: number[]) {
     const variance = arr.reduce((s, x) => s + (x - mean) ** 2, 0) / arr.length
     return Math.sqrt(variance)
 }
+
+export function secondsLeft(endDate: string) {
+    const endMs = new Date(endDate).getTime();
+    const now = Date.now();
+    return Math.max(0, Math.floor((endMs - now) / 1000));
+}

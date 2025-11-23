@@ -1,16 +1,18 @@
 import { chunkArray, dirExists, sleep } from "./helper";
-import { PolymarketMarket } from "./types";
+import { CryptoPriceSymbol, CryptoPriceUint, PolymarketMarket } from "./types";
 import { ConfigType, getConfig } from './config';
 import { SocksProxyAgent } from "socks-proxy-agent";
 import WebSocket from 'ws';
 import { EventEmitter } from "events";
 import { eventBus, EVENT_KEY_BN_PRICE, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_MARKET_CREATE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from "./event-bus";
-import { fetchMarketByCId, searchMarkets } from "./polymarket";
+import { fetchCryptoPrice, fetchMarketByCId, searchMarkets } from "./polymarket";
 import path from "path";
 import fs from "fs/promises"
+import PQueue from 'p-queue';
 
 const EVENT_KEY_BINANCE_PRICES = 'binance:prices'
 const EVENT_KEY_POLYLIVE_PRICES = 'polylive:prices'
+const EVENT_KEY_POLYLIVE_MARKET = 'polylive:market'
 
 
 /**
@@ -22,11 +24,16 @@ export class MarketMonitor extends EventEmitter {
     private config: ConfigType
     private running = false;
     private pinging = false;
+    private pingingClob = false;
 
     private binanceWS: WebSocket | null = null;
     private polyliveWS: WebSocket | null = null;
-    private lastMsgTime = 0;
-    private readonly POLYLIVE_WS_BASE = 'wss://ws-live-data.polymarket.com';
+    private polyclobWS: WebSocket | null = null;
+    private fetchPriceQueue = new PQueue({ concurrency: 1, interval: 5_000 })
+    private lastClobMsgTime = 0
+    private lastClobCheck = false
+    private readonly POLY_LIVE_BASE = 'wss://ws-live-data.polymarket.com';
+    private readonly POLY_MARKET_BASE = 'wss://ws-subscriptions-clob.polymarket.com/ws/market'
     private readonly BINANCE_WS_BASE = "wss://stream.binance.com:9443";
     private readonly marketMapFilePath = `${process.cwd()}/data`
     private readonly marketMapFile;
@@ -62,7 +69,9 @@ export class MarketMonitor extends EventEmitter {
         this.onBinanceMessage = this.onBinanceMessage.bind(this)
         this.on(EVENT_KEY_BINANCE_PRICES, this.onBinanceMessage)
         this.onPolyLiveMessage = this.onPolyLiveMessage.bind(this)
-        this.on(EVENT_KEY_POLYLIVE_PRICES, this.onPolyLiveMessage)
+        this.on(EVENT_KEY_POLYLIVE_MARKET, this.onPolyLiveMessage)
+        this.onPolyClobMessage = this.onPolyClobMessage.bind(this)
+        this.on(EVENT_KEY_POLYLIVE_PRICES, this.onPolyClobMessage)
     }
 
     public getMarket(conditionId: string) {
@@ -77,6 +86,8 @@ export class MarketMonitor extends EventEmitter {
         this.attachBNHandlers()
         this.createPolyWS()
         this.attachPolyHandlers()
+        this.createPolyClobWS()
+        this.attachPolyClobHandlers()
     }
 
 
@@ -93,7 +104,7 @@ export class MarketMonitor extends EventEmitter {
 
 
 
-    public async ping() {
+    public async pingLive() {
         if (this.pinging) return;
         this.pinging = true;
         while (this.running) {
@@ -103,6 +114,20 @@ export class MarketMonitor extends EventEmitter {
                 }))
             }
             await sleep(5)
+        }
+    }
+
+    public async pingClob() {
+        if (this.pingingClob) return;
+        this.pingingClob = true;
+        while (this.running) {
+            if (this.polyclobWS?.readyState === WebSocket.OPEN) {
+                // this.polyclobWS?.send(JSON.stringify({
+                //     type: 'PING'
+                // }))
+                this.polyclobWS?.send('PING')
+            }
+            await sleep(10)
         }
     }
 
@@ -117,9 +142,17 @@ export class MarketMonitor extends EventEmitter {
 
     private createPolyWS() {
         if (this.config.SOCKS_PROXY) {
-            this.polyliveWS = new WebSocket(this.POLYLIVE_WS_BASE, { agent: new SocksProxyAgent(this.config.SOCKS_PROXY) as any });
+            this.polyliveWS = new WebSocket(this.POLY_LIVE_BASE, { agent: new SocksProxyAgent(this.config.SOCKS_PROXY) as any });
         } else {
-            this.polyliveWS = new WebSocket(this.POLYLIVE_WS_BASE);
+            this.polyliveWS = new WebSocket(this.POLY_LIVE_BASE);
+        }
+    }
+
+    private createPolyClobWS() {
+        if (this.config.SOCKS_PROXY) {
+            this.polyclobWS = new WebSocket(this.POLY_MARKET_BASE, { agent: new SocksProxyAgent(this.config.SOCKS_PROXY) as any });
+        } else {
+            this.polyclobWS = new WebSocket(this.POLY_MARKET_BASE);
         }
     }
 
@@ -127,7 +160,7 @@ export class MarketMonitor extends EventEmitter {
         if (!this.binanceWS) return
 
         this.binanceWS.onopen = () => { console.debug("Binance WS connected:", this.BINANCE_WS_BASE); }
-        this.binanceWS.onmessage = (raw) => { this.emit('binance:prices', raw.data.toString()) }
+        this.binanceWS.onmessage = (raw) => { this.emit(EVENT_KEY_BINANCE_PRICES, raw.data.toString()) }
         this.binanceWS.onerror = (err) => { console.error(`Binance WS error: ${JSON.stringify(err.message)}`); }
         this.binanceWS.onclose = (info) => {
             console.debug(`Binance WS closed (code=${info.code})`);
@@ -151,30 +184,16 @@ export class MarketMonitor extends EventEmitter {
         }
     }
 
-    private attachPolyHandlers(isReconnect = false) {
+    private attachPolyHandlers() {
         if (!this.polyliveWS) return
 
         this.polyliveWS.onopen = async () => {
-            console.debug(`PolyLive WS connected: ${this.POLYLIVE_WS_BASE}`);
+            console.debug(`PolyLive WS connected: ${this.POLY_LIVE_BASE}`);
             this.polyliveWS?.send(JSON.stringify({
                 "action": "subscribe",
                 "subscriptions": this.subscriptions
             }))
-            // 如果marketMap有数据，则续订所有market
-            if (isReconnect && this.marketMap.size > 0) {
-                this.marketMap.forEach((m, _) => {
-                    m.clobTokenIds.forEach(tokenId => {
-                        this.subsTokens.add(tokenId)
-                    })
-                })
-                this.subscribeMarket()
-            }
-            setTimeout(() => this.ping(), 1000);
-            if (!isReconnect) {
-                await this.initMarketMap() // 初始化本地存储的marketMap
-                await this.searchMarkets() // 开始搜索市场
-            }
-
+            setTimeout(() => this.pingLive(), 1000);
         };
 
         this.polyliveWS.onclose = (ev) => {
@@ -193,7 +212,7 @@ export class MarketMonitor extends EventEmitter {
                 backoffMs = Math.min(backoffMs * 1.5, this.reconnectMaxMs);
                 if (this.running) {
                     this.createPolyWS();
-                    this.attachPolyHandlers(true);
+                    this.attachPolyHandlers();
                 }
             }, backoffMs);
         };
@@ -202,7 +221,55 @@ export class MarketMonitor extends EventEmitter {
 
         this.polyliveWS.onmessage = (raw) => {
             if (raw.data === 'PONG' || raw.data === '') return
-            this.lastMsgTime = Date.now()
+            this.emit(EVENT_KEY_POLYLIVE_MARKET, raw.data.toString())
+        }
+    }
+
+    private attachPolyClobHandlers(isReconnect = false) {
+        if (!this.polyclobWS) return
+
+        this.polyclobWS.onopen = async () => {
+            console.debug("PolyClob WS connected:", this.POLY_MARKET_BASE);
+            // 如果marketMap有数据，则续订所有market
+            if (isReconnect) {
+                this.subscribeMarket()
+            } else {
+                await this.initMarketMap() // 初始化本地存储的marketMap
+                this.searchMarkets() // 开始搜索市场
+                // this.checkClobMessage()
+            }
+            this.lastClobMsgTime = Date.now()
+            // setTimeout(() => this.pingClob(), 10_000);
+        }
+
+        this.polyclobWS.onclose = (ev) => {
+            console.debug(`PolyClob WS closed (code=${ev.code})`);
+            // 如果批次已经结束或外部停止，则直接 resolve（如果尚未 resolve）
+            if (this.running === false) {
+                console.info('PolyClobMonitor stopped.');
+                return;
+            }
+
+            let backoffMs = this.reconnectBaseMs;
+            // 否则我们需要重连（带退避）
+            console.debug(`PolyClob WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
+            this.pingingClob = false
+            setTimeout(() => {
+                backoffMs = Math.min(backoffMs * 1.5, this.reconnectMaxMs);
+                if (this.running) {
+                    this.createPolyClobWS();
+                    this.attachPolyClobHandlers(true);
+                }
+            }, backoffMs);
+        };
+
+        this.polyclobWS.onerror = (err) => {
+            // console.error(`PolyClob WS error: ${JSON.stringify(err.message)}`)
+        };
+
+        this.polyclobWS.onmessage = (raw) => {
+            if (raw.data === 'PONG' || raw.data === '') return
+            this.lastClobMsgTime = Date.now()
             this.emit(EVENT_KEY_POLYLIVE_PRICES, raw.data.toString())
         }
     }
@@ -212,17 +279,28 @@ export class MarketMonitor extends EventEmitter {
      * @param conditionId 
      */
     public subscribeMarket(m?: PolymarketMarket | string) {
-        let market: PolymarketMarket | undefined
         if (!m) {
-
+            this.clearSubsTokens()
+            const msg = { type: 'MARKET', assets_ids: Array.from(this.subsTokens) }
+            if (this.polyclobWS && this.polyclobWS.readyState === WebSocket.OPEN && this.subsTokens.size > 0) {
+                this.polyclobWS.send(JSON.stringify(msg), (err?: Error) => {
+                    if (err) {
+                        console.error(`Subscribe market error: ${err.message}`)
+                    }
+                })
+                console.debug(`Subscribed to market: ${JSON.stringify(msg)}`)
+            }
+            console.info(`monitor market count: ${this.marketMap.size}`)
         } else if (typeof m === 'string') {
-            market = this.marketMap.get(m)
+            let market = this.marketMap.get(m)
             if (market) {
                 market.clobTokenIds.forEach(tokenId => {
                     this.subsTokens.add(tokenId)
                 })
-            } else {
-                return
+
+                if (this.polyclobWS) {
+                    this.polyclobWS.close()
+                }
             }
         } else {
             if (this.marketMap.has(m.conditionId) === false) {
@@ -231,38 +309,11 @@ export class MarketMonitor extends EventEmitter {
             m.clobTokenIds.forEach(tokenId => {
                 this.subsTokens.add(tokenId)
             })
-            market = m
-        }
 
-        this.clearSubsTokens()
-
-        let filters = JSON.stringify(Array.from(this.subsTokens))
-        const msg = {
-            action: "subscribe",
-            subscriptions: [
-                {
-                    topic: "clob_market",
-                    type: "price_change",
-                    filters
-                },
-                {
-                    topic: "clob_market",
-                    type: "agg_orderbook",
-                    filters
-                },
-                {
-                    topic: "clob_market",
-                    type: "last_trade_price",
-                    filters
-                }
-            ]
-        }
-        this.polyliveWS?.send(JSON.stringify(msg), (err?: Error) => {
-            if (err) {
-                console.error(`Subscribe market error: ${err.message}`)
+            if (this.polyclobWS) {
+                this.polyclobWS.close()
             }
-        })
-        console.debug(`Subscribed to market: ${JSON.stringify(msg)}`)
+        }
     }
 
     /**
@@ -271,31 +322,8 @@ export class MarketMonitor extends EventEmitter {
      */
     public unSubscribeMarket(conditionId: string) {
         const market = this.marketMap.get(conditionId)
-        if (market && this.polyliveWS && this.polyliveWS.readyState === WebSocket.OPEN) {
-            this.polyliveWS.send(JSON.stringify({
-                action: "unsubscribe",
-                subscriptions: [
-                    {
-                        topic: "clob_market",
-                        type: "price_change",
-                        filters: JSON.stringify(market.clobTokenIds)
-                    },
-                    {
-                        topic: "clob_market",
-                        type: "agg_orderbook",
-                        filters: JSON.stringify(market.clobTokenIds)
-                    },
-                    {
-                        topic: "clob_market",
-                        type: "last_trade_price",
-                        filters: JSON.stringify(market.clobTokenIds)
-                    }
-                ]
-            }), (err?: Error) => {
-                if (err) {
-                    console.error(`Unsubscribe market error: ${err.message}`)
-                }
-            })
+        if (market && this.polyclobWS && this.polyclobWS.readyState === WebSocket.OPEN) {
+            // api不提供取消订阅
         }
     }
 
@@ -327,6 +355,44 @@ export class MarketMonitor extends EventEmitter {
         }
     }
 
+    private async onPolyClobMessage(data: string) {
+        try {
+            const update = JSON.parse(data);
+            const { event_type } = update;
+            if (event_type === 'book') {
+                const market = this.marketMap.get(update.market)
+                if (!market) return
+
+                const token = market.tokens.find((t: any) => t.tokenId === update.asset_id);
+                if (!token) return;
+
+                const bidIndex = update.bids.length - 1;
+                const askIndex = update.asks.length - 1;
+                token.bid = update.bids.length > 0 ? { price: parseFloat(update.bids[bidIndex].price), size: parseFloat(update.bids[bidIndex].size) } : { price: 0, size: 0 };
+                token.ask = update.asks.length > 0 ? { price: parseFloat(update.asks[askIndex].price), size: parseFloat(update.asks[askIndex].size) } : { price: 0, size: 0 };
+
+                eventBus.emit(EVENT_KEY_POLYMARKET_PRICE, market)
+            } else if (event_type === 'last_trade_price') {
+                const market = this.marketMap.get(update.market)
+                if (!market) return
+
+                const token = market.tokens.find((t: any) => t.tokenId === update.asset_id);
+                if (!token) return;
+
+                token.price = parseFloat(update.price);
+                if (update.side.toUpperCase() === 'BUY') {
+                    token.lastBuy.push({ time: Date.now(), price: parseFloat(update.price), size: parseFloat(update.size) });
+                    token.lastBuy = token.lastBuy.filter(t => t.time > Date.now() - this.config.KEEP_LAST_TRADE_TIME * 1000)
+                } else {
+                    token.lastSell.push({ time: Date.now(), price: parseFloat(update.price), size: parseFloat(update.size) });
+                    token.lastSell = token.lastSell.filter(t => t.time > Date.now() - this.config.KEEP_LAST_TRADE_TIME * 1000)
+                }
+            }
+        } catch (err) {
+            console.warn('onPolyClobMessage error', err);
+        }
+    }
+
     private async onPolyLiveMessage(data: string) {
         try {
             const msg = JSON.parse(data)
@@ -336,37 +402,6 @@ export class MarketMonitor extends EventEmitter {
                 // await this.onMarketCreated(msg.payload.market)
             } else if (msg.type === 'market_resolved') {
                 await this.onMarketResolved(msg)
-            } else if (msg.type === 'agg_orderbook') {
-                const market = this.marketMap.get(msg.payload.market)
-                if (!market) return
-
-                const token = market.tokens.find((t: any) => t.tokenId === msg.payload.asset_id);
-                if (!token) return;
-
-                const bidIndex = msg.payload.bids.length - 1;
-                const askIndex = msg.payload.asks.length - 1;
-                token.bid = msg.payload.bids.length > 0 ? { price: parseFloat(msg.payload.bids[bidIndex].price), size: parseFloat(msg.payload.bids[bidIndex].size) } : { price: 0, size: 0 };
-                token.ask = msg.payload.asks.length > 0 ? { price: parseFloat(msg.payload.asks[askIndex].price), size: parseFloat(msg.payload.asks[askIndex].size) } : { price: 0, size: 0 };
-
-                eventBus.emit(EVENT_KEY_POLYMARKET_PRICE, market)
-            } else if (msg.type === 'price_change') {
-
-            } else if (msg.type === 'last_trade_price') {
-                // console.log('last_trade_price:', JSON.stringify(msg.payload))
-                const market = this.marketMap.get(msg.payload.market)
-                if (!market) return
-
-                const token = market.tokens.find((t: any) => t.tokenId === msg.payload.asset_id);
-                if (!token) return;
-
-                token.price = parseFloat(msg.payload.price);
-                if (msg.payload.side.toUpperCase() === 'BUY') {
-                    token.lastBuy.push({ time: Date.now(), price: parseFloat(msg.payload.price), size: parseFloat(msg.payload.size) });
-                    token.lastBuy = token.lastBuy.filter(t => t.time > Date.now() - this.config.KEEP_LAST_TRADE_TIME * 1000)
-                } else {
-                    token.lastSell.push({ time: Date.now(), price: parseFloat(msg.payload.price), size: parseFloat(msg.payload.size) });
-                    token.lastSell = token.lastSell.filter(t => t.time > Date.now() - this.config.KEEP_LAST_TRADE_TIME * 1000)
-                }
             }
         } catch (err) {
             console.warn('onPolyLiveMessage error', err);
@@ -374,7 +409,7 @@ export class MarketMonitor extends EventEmitter {
     }
 
     async onMarketCreated(conditionId: string) {
-        const market = await this.getMarketByCId(conditionId)
+        const market = await fetchMarketByCId(conditionId)
         if (!market) return
 
         console.debug(`create market: ${JSON.stringify(market)}`)
@@ -388,6 +423,11 @@ export class MarketMonitor extends EventEmitter {
         })
     }
 
+    /**
+     * 主要用于清理订阅的token, redeem不依靠这个, 这个可能不稳定有漏领取的风险
+     * @param msg 
+     * @returns 
+     */
     async onMarketResolved(msg: any) {
         console.debug(`resolved market: ${JSON.stringify(msg)}`)
         const market = this.marketMap.get(msg.payload.market)
@@ -405,6 +445,7 @@ export class MarketMonitor extends EventEmitter {
 
         // 删除市场
         this.marketMap.delete(market.conditionId)
+        console.info(`monitor market count: ${this.marketMap.size}`)
     }
 
     private async initMarketMap() {
@@ -419,7 +460,7 @@ export class MarketMonitor extends EventEmitter {
             if (Array.isArray(data)) {
                 const chunks = chunkArray(data, 5)
                 for (const chunk of chunks) {
-                    const markets = await Promise.all(chunk.map(c => this.getMarketByCId(c)))
+                    const markets = await Promise.all(chunk.map(c => fetchMarketByCId(c)))
                     markets.forEach(m => {
                         if (m && m.closed === false && new Date(m.endDate).getTime() > Date.now()) {
                             TAG_SLUGS.forEach(slug => {
@@ -444,16 +485,11 @@ export class MarketMonitor extends EventEmitter {
         await fs.writeFile(this.marketMapFile, JSON.stringify(cids))
     }
 
-    private async getMarketByCId(conditionId: string) {
-        const market = await fetchMarketByCId(conditionId)
-        if (!market) return null
-        return market
-    }
-
     /**
      * 清理已经结束的市场token监听
      */
     private clearSubsTokens() {
+        // 及时清理订阅
         this.marketMap.forEach((m, _) => {
             if (new Date(m.endDate).getTime() <= Date.now()) {
                 m.clobTokenIds.forEach(tokenId => {
@@ -461,15 +497,30 @@ export class MarketMonitor extends EventEmitter {
                 })
             }
         })
+        // 延迟清理市场(结束15分钟的就无条件清理)
+        const mIds = Array.from(this.marketMap.values()).filter(m => new Date(m.endDate).getTime() + 15 * 60 * 1000 <= Date.now()).map(m => m.conditionId)
+        mIds.forEach(mId => {
+            this.marketMap.delete(mId)
+        })
+    }
+
+    /**
+     * 暂时停用, 已经改为在订阅时重新连接ws
+     * @returns 
+     */
+    private async checkClobMessage() {
+        if (this.lastClobCheck) return
+        this.lastClobCheck = true
+        while (this.running) {
+            if (Date.now() - this.lastClobMsgTime > 1000 * 30) {
+                this.polyclobWS?.close()
+            }
+            await sleep(20)
+        }
     }
 
     private async searchMarkets() {
         while (this.running) {
-            this.clearSubsTokens()
-            if (Date.now() - this.lastMsgTime > 1000 * 60) {
-                // this.subscribeMarket()
-                this.polyliveWS?.close()
-            }
             // 获取新的市场数据
             const endDateMin = new Date()
             endDateMin.setMinutes(endDateMin.getMinutes() + 7)  // 最早7分钟后结束
@@ -494,5 +545,11 @@ export class MarketMonitor extends EventEmitter {
             }
             await sleep(60) // 每分钟检查一次
         }
+    }
+
+    public getCryptoPrice(symbol: CryptoPriceSymbol, startTime: Date, endTime: Date, unit: CryptoPriceUint, retries: number = 20) {
+        return this.fetchPriceQueue.add(() => {
+            return fetchCryptoPrice(symbol, startTime, endTime, unit, retries)
+        })
     }
 }

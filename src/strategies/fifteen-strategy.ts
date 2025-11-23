@@ -18,13 +18,14 @@
 
 import { eventBus, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_BN_PRICE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from '../event-bus';
 import { MarketMonitor } from '../market-monitor';
-import { fetchCryptoPrice, getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from '../polymarket';
+import { getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from '../polymarket';
 import { CryptoPriceSymbol, PolymarketMarket, SlidingWindow } from '../types';
+import { delPosition, getPositions, onPriceUpdate, getCash } from '../position';
 
 const ENTRY_WINDOW_LOW = 60; // seconds
-const ENTRY_WINDOW_HIGH = 14 * 60; // seconds
-const TREND_THRESHOLD = 0.0006; // 0.06% -> 0.0006
-const MIN_PRICE_DELTA_THRESHOLD = 0.0015; // 0.15%
+const ENTRY_WINDOW_HIGH = 14.5 * 60; // seconds
+const TREND_THRESHOLD = 0.0002; // 0.02% -> 0.0002
+const MIN_PRICE_DELTA_THRESHOLD = 0.0008; // 0.08%
 const MAX_PRICE_DELTA_THRESHOLD = 0.0035; // 0.35%
 const MAX_ENTRY_PRICE = 0.68
 const MAX_BOOK_DIFF = 0.25
@@ -85,7 +86,7 @@ eventBus.on(EVENT_KEY_BN_PRICE, ({ symbol, price, volume, time }: { symbol: stri
  */
 async function checkSignal(market: PolymarketMarket) {
     const timeLeft = secondsLeft(market.endDate);
-    console.log('timeLeft:', timeLeft)
+    // console.log('timeLeft:', timeLeft)
     // 时间窗口内入场
     if (timeLeft > ENTRY_WINDOW_HIGH || timeLeft < ENTRY_WINDOW_LOW) return
 
@@ -103,7 +104,6 @@ async function checkSignal(market: PolymarketMarket) {
     const avg10 = win10.avg();
     // 30秒算术平均价格
     const avg30 = win30.avg();
-    console.log('symbol:', symbol, 'avg10:', avg10, 'avg30:', avg30, 'openPrice:', openPrice, 'nowPrice:', nowPrice, 'yesPrice:', yesPrice, 'noPrice:', noPrice)
     if (!avg10 || !avg30) return;
 
     // 方向信号
@@ -117,21 +117,22 @@ async function checkSignal(market: PolymarketMarket) {
     // 对数收益标准差
     const volatility_10s = win10.std()
     const volatility_30s = win30.std()
-    console.log('volatility_10s:', volatility_10s, 'volatility_30s:', volatility_30s, 'trendScore:', trendScore, 'vol:', vol)
     if (!volatility_10s || !volatility_30s) return;
 
     // 盘口差
     const bookDiff = Math.abs(yesPrice - noPrice)
-    console.log('bookDiff:', bookDiff)
     if (bookDiff > MAX_BOOK_DIFF) return
 
-    console.log('trendScore >= TREND_THRESHOLD:', trendScore >= TREND_THRESHOLD,
-        '\n(vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD):', (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD),
-        '\n(p_now > p_open && p_now > avg10 && avg10 >= avg30):', (p_now > p_open && p_now > avg10 && avg10 >= avg30),
-        '\nvolatility_10s > VOLATILITY_MARGIN * volatility_30s:', volatility_10s > VOLATILITY_MARGIN * volatility_30s
-    )
+    console.debug(`symbol: ${symbol}, openPrice: ${openPrice}, nowPrice: ${nowPrice}, yesPrice: ${yesPrice}, noPrice: ${noPrice}
+        avg10: ${avg10}, avg30: ${avg30}, volatility_10s: ${volatility_10s}, volatility_30s: ${volatility_30s}
+        trendScore: ${trendScore}, vol: ${vol}, bookDiff: ${bookDiff}
+        trendScore >= TREND_THRESHOLD[${TREND_THRESHOLD}]: ${trendScore >= TREND_THRESHOLD},${trendScore <= -TREND_THRESHOLD}
+        (vol >= MIN_PRICE_DELTA_THRESHOLD[${MIN_PRICE_DELTA_THRESHOLD}] && vol <= MAX_PRICE_DELTA_THRESHOLD[${MAX_PRICE_DELTA_THRESHOLD}]): ${(vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD)}
+        (p_now >= p_open && p_now >= avg10 && avg10 >= avg30): ${(p_now >= p_open && p_now >= avg10 && avg10 >= avg30)}, ${(p_now < p_open && p_now < avg10 && avg10 < avg30)}
+        volatility_10s > VOLATILITY_MARGIN[${VOLATILITY_MARGIN}] * volatility_30s: ${volatility_10s > VOLATILITY_MARGIN * volatility_30s}`)
+
     // BUY UP condition
-    if (trendScore >= TREND_THRESHOLD && (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD) && (p_now > p_open && p_now > avg10 && avg10 >= avg30) && volatility_10s > VOLATILITY_MARGIN * volatility_30s) {
+    if (trendScore >= TREND_THRESHOLD && (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD) && (p_now >= p_open && p_now >= avg10 && avg10 >= avg30) && volatility_10s > VOLATILITY_MARGIN * volatility_30s) {
         if (!yesPrice || yesPrice > MAX_ENTRY_PRICE) return
 
         console.warn("=== DECISION: BUY UP", JSON.stringify({ timeLeft, trendScore, p_now, p_open, vol, yesPrice, noPrice, avg10, avg30, volatility_10s, volatility_30s }));
@@ -139,7 +140,7 @@ async function checkSignal(market: PolymarketMarket) {
     }
 
     // BUY DOWN condition
-    if (trendScore <= -TREND_THRESHOLD && (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD) && (p_now < p_open && p_now < avg10 && avg10 <= avg30) && volatility_10s > VOLATILITY_MARGIN * volatility_30s) {
+    if (trendScore <= -TREND_THRESHOLD && (vol >= MIN_PRICE_DELTA_THRESHOLD && vol <= MAX_PRICE_DELTA_THRESHOLD) && (p_now < p_open && p_now < avg10 && avg10 < avg30) && volatility_10s > VOLATILITY_MARGIN * volatility_30s) {
         if (!noPrice || noPrice > MAX_ENTRY_PRICE) return
 
         console.warn("=== DECISION: BUY DOWN", JSON.stringify({ timeLeft, trendScore, p_now, p_open, vol, yesPrice, noPrice, avg10, avg30, volatility_10s, volatility_30s }));
@@ -165,7 +166,8 @@ async function onMarketStart({ market, monitor }: { market: PolymarketMarket, mo
         symbolMap.set(market.conditionId, symbol)
         let openPrice: number | undefined | null = openPriceMap.get(market.conditionId)
         if (!openPrice) {
-            openPrice = await fetchCryptoPrice(symbol, startTime, endTime, unit)
+            openPrice = await monitor.getCryptoPrice(symbol, startTime, endTime, unit)
+            console.log('openPrice:', openPrice)
             if (openPrice)
                 openPriceMap.set(market.conditionId, openPrice)
         }
@@ -217,8 +219,8 @@ function onUpdateMarket(market: PolymarketMarket) {
 
 
 
-function secondsLeft(endDateIso: string) {
-    const endMs = new Date(endDateIso).getTime();
+function secondsLeft(endDate: string) {
+    const endMs = new Date(endDate).getTime();
     const now = Date.now();
     return Math.max(0, Math.floor((endMs - now) / 1000));
 }

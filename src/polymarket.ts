@@ -120,7 +120,7 @@ export async function fetchCryptoPrice(symbol: CryptoPriceSymbol, startTime: Dat
             const data = await response.json() as any;
             return (data.openPrice ?? 0) as number
         } catch (e) {
-            console.error("fetchCryptoPrice error:", e, url)
+            // console.error("fetchCryptoPrice error:", e, url)
             if (attempt > retries) break;
 
             const delay = retryDelay * 2 ** (attempt - 1);
@@ -233,7 +233,7 @@ export async function fetchUpcomingEvents(startTime: number = 0, endTime: number
             if (data.length === 0) break;
 
             // 过滤掉小于最小交易量的事件
-            const parsedEvents = data.filter(e => (e.volume || 0) >= config.MIN_VOLUME);
+            const parsedEvents = data.filter(e => (e.volume || 0) >= 1000);
             parsedEvents.forEach(e => {
                 // 初始化数据
                 e.tradeCount = 0

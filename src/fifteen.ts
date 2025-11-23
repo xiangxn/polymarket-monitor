@@ -8,14 +8,15 @@ initEncryptor()
 
 import './utils/console'
 
-import './strategies/fifteen-strategy'; // 启动策略监听
 import { MarketMonitor } from './market-monitor';
+import { CryptoPriceStrategy } from "./strategies/crypto-price-strategy";
 
 
 
 async function main() {
 
     const marketMonitor = new MarketMonitor()
+    const fifteenStrategy = new CryptoPriceStrategy()
 
     process.on('SIGINT', async () => {
         console.info('SIGINT received — shutting down gracefully...');
@@ -27,6 +28,7 @@ async function main() {
     // 清除控制台
     console.clear()
 
+    fifteenStrategy.start()
     await marketMonitor.start();
 }
 
