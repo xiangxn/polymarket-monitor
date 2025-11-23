@@ -4,13 +4,14 @@ import { ConfigType, getConfig } from './config';
 import { SocksProxyAgent } from "socks-proxy-agent";
 import WebSocket from 'ws';
 import { EventEmitter } from "events";
-import { eventBus, EVENT_KEY_BN_PRICE, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_MARKET_CREATE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from "./event-bus";
+import { eventBus, EVENT_KEY_UPDATE_PRICE, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_MARKET_CREATE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from "./event-bus";
 import { fetchCryptoPrice, fetchMarketByCId, searchMarkets } from "./polymarket";
 import path from "path";
 import fs from "fs/promises"
 import PQueue from 'p-queue';
 
 const EVENT_KEY_BINANCE_PRICES = 'binance:prices'
+const EVENT_KEY_CHAINLINK_PRICES = 'chainlink:prices'
 const EVENT_KEY_POLYLIVE_PRICES = 'polylive:prices'
 const EVENT_KEY_POLYLIVE_MARKET = 'polylive:market'
 
@@ -52,6 +53,11 @@ export class MarketMonitor extends EventEmitter {
         {
             topic: "clob_market",
             type: "market_resolved"
+        },
+        {
+            topic: "crypto_prices_chainlink",
+            type: "update",
+            filters: `[{"symbol":"btc/usd"},{"symbol":"eth/usd"},{"symbol":"sol/usd"},{"symbol":"xrp/usd"}]`
         }
     ]
 
@@ -66,12 +72,18 @@ export class MarketMonitor extends EventEmitter {
         super();
         this.config = getConfig();
         this.marketMapFile = path.join(this.marketMapFilePath, 'markets.json')
+
+        this.onChainLinkMessage = this.onChainLinkMessage.bind(this)
+        this.on(EVENT_KEY_CHAINLINK_PRICES, this.onChainLinkMessage)
+
         this.onBinanceMessage = this.onBinanceMessage.bind(this)
         this.on(EVENT_KEY_BINANCE_PRICES, this.onBinanceMessage)
-        this.onPolyLiveMessage = this.onPolyLiveMessage.bind(this)
-        this.on(EVENT_KEY_POLYLIVE_MARKET, this.onPolyLiveMessage)
+
         this.onPolyClobMessage = this.onPolyClobMessage.bind(this)
         this.on(EVENT_KEY_POLYLIVE_PRICES, this.onPolyClobMessage)
+
+        this.onPolyLiveMessage = this.onPolyLiveMessage.bind(this)
+        this.on(EVENT_KEY_POLYLIVE_MARKET, this.onPolyLiveMessage)
     }
 
     public getMarket(conditionId: string) {
@@ -82,8 +94,9 @@ export class MarketMonitor extends EventEmitter {
         if (this.running) return;
         this.running = true;
         console.info('MarketMonitor starting...');
-        this.createBNWS()
-        this.attachBNHandlers()
+        // this.createBNWS()
+        // this.attachBNHandlers()
+
         this.createPolyWS()
         this.attachPolyHandlers()
         this.createPolyClobWS()
@@ -97,7 +110,9 @@ export class MarketMonitor extends EventEmitter {
         this.running = false;
         this.pinging = false;
         this.off(EVENT_KEY_BINANCE_PRICES, this.onBinanceMessage)
-        this.off(EVENT_KEY_POLYLIVE_PRICES, this.onPolyLiveMessage)
+        this.off(EVENT_KEY_CHAINLINK_PRICES, this.onChainLinkMessage)
+        this.off(EVENT_KEY_POLYLIVE_PRICES, this.onPolyClobMessage)
+        this.off(EVENT_KEY_POLYLIVE_MARKET, this.onPolyLiveMessage)
         // 等几个 tick 让 pending things 收尾
         await new Promise(res => setTimeout(res, 500));
     }
@@ -221,7 +236,16 @@ export class MarketMonitor extends EventEmitter {
 
         this.polyliveWS.onmessage = (raw) => {
             if (raw.data === 'PONG' || raw.data === '') return
-            this.emit(EVENT_KEY_POLYLIVE_MARKET, raw.data.toString())
+            try {
+                const data = JSON.parse(raw.data.toString())
+                if (data.topic == 'crypto_prices_chainlink') {
+                    this.emit(EVENT_KEY_CHAINLINK_PRICES, data)
+                } else {
+                    this.emit(EVENT_KEY_POLYLIVE_MARKET, data)
+                }
+            } catch (err) {
+                console.warn('polyliveWS error', err);
+            }
         }
     }
 
@@ -327,6 +351,29 @@ export class MarketMonitor extends EventEmitter {
         }
     }
 
+    private onChainLinkMessage(data: any) {
+        /**
+        {
+            "connection_id": "UgFFReb0rPECGmg=",
+            "payload": {
+                "full_accuracy_value": "2830920258000000000000",
+                "symbol": "eth/usd",
+                "timestamp": 1763908539000,
+                "value": 2830.920258
+            },
+            "timestamp": 1763908540007,
+            "topic": "crypto_prices_chainlink",
+            "type": "update"
+        }
+        */
+        if (data.type !== 'update') return
+
+        const { payload } = data
+        eventBus.emit(EVENT_KEY_UPDATE_PRICE, {
+            symbol: payload.symbol.split('/')[0].toUpperCase(), price: Number(payload.value), volume: 0, time: Number(payload.timestamp)
+        })
+    }
+
     private onBinanceMessage(data: string) {
         /**
          * {
@@ -347,7 +394,7 @@ export class MarketMonitor extends EventEmitter {
         try {
             const msg = JSON.parse(data);
             if (!msg.data?.p) return;
-            eventBus.emit(EVENT_KEY_BN_PRICE, {
+            eventBus.emit(EVENT_KEY_UPDATE_PRICE, {
                 symbol: msg.data.s.replace("USDT", ''), price: Number(msg.data.p), volume: Number(msg.data.q), time: Number(msg.data.T)
             })
         } catch (err) {
@@ -393,19 +440,15 @@ export class MarketMonitor extends EventEmitter {
         }
     }
 
-    private async onPolyLiveMessage(data: string) {
-        try {
-            const msg = JSON.parse(data)
-            if (msg.topic !== 'clob_market') return
+    private async onPolyLiveMessage(msg: any) {
+        if (msg.topic !== 'clob_market') return
 
-            if (msg.type === 'market_created') {
-                // await this.onMarketCreated(msg.payload.market)
-            } else if (msg.type === 'market_resolved') {
-                await this.onMarketResolved(msg)
-            }
-        } catch (err) {
-            console.warn('onPolyLiveMessage error', err);
+        if (msg.type === 'market_created') {
+            // await this.onMarketCreated(msg.payload.market)
+        } else if (msg.type === 'market_resolved') {
+            await this.onMarketResolved(msg)
         }
+
     }
 
     async onMarketCreated(conditionId: string) {

@@ -16,7 +16,7 @@
    polymarket_last_trade 在 up 方向
 */
 
-import { eventBus, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_BN_PRICE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from '../event-bus';
+import { eventBus, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_UPDATE_PRICE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from '../event-bus';
 import { MarketMonitor } from '../market-monitor';
 import { getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from '../polymarket';
 import { CryptoPriceSymbol, PolymarketMarket, SlidingWindow } from '../types';
@@ -63,7 +63,7 @@ eventBus.on(EVENT_KEY_MARKET_RESOLVED, onMarketResolved)
 eventBus.on(EVENT_KEY_POLYMARKET_PRICE, onUpdateMarket)
 
 // BN 价格更新, 更新对应的滑动窗口
-eventBus.on(EVENT_KEY_BN_PRICE, ({ symbol, price, volume, time }: { symbol: string, price: number, volume: number, time: number }) => {
+eventBus.on(EVENT_KEY_UPDATE_PRICE, ({ symbol, price, volume, time }: { symbol: string, price: number, volume: number, time: number }) => {
     let tokenW10 = win10Map.get(symbol)
     if (!tokenW10) {
         tokenW10 = new SlidingWindow(10_000)

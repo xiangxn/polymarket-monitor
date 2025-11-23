@@ -1,5 +1,5 @@
 import { CryptoPriceSymbol, PolymarketMarket, SlidingWindow } from "../types"
-import { eventBus, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_BN_PRICE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from '../event-bus';
+import { eventBus, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_UPDATE_PRICE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from '../event-bus';
 import { MarketMonitor } from "../market-monitor";
 import { getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from "../polymarket";
 import { secondsLeft } from "../utils/math";
@@ -50,14 +50,14 @@ export class CryptoPriceStrategy {
         eventBus.on(`${EVENT_KEY_MARKET_START}:${this.eventType}`, this.onMarketStart)
         eventBus.on(EVENT_KEY_MARKET_RESOLVED, this.onMarketResolved)
         eventBus.on(EVENT_KEY_POLYMARKET_PRICE, this.onMarketPriceUpdate)
-        eventBus.on(EVENT_KEY_BN_PRICE, this.onBinancePriceUpdate)
+        eventBus.on(EVENT_KEY_UPDATE_PRICE, this.onBinancePriceUpdate)
     }
 
     public stop() {
         eventBus.off(`${EVENT_KEY_MARKET_START}:${this.eventType}`, this.onMarketStart)
         eventBus.off(EVENT_KEY_MARKET_RESOLVED, this.onMarketResolved)
         eventBus.off(EVENT_KEY_POLYMARKET_PRICE, this.onMarketPriceUpdate)
-        eventBus.off(EVENT_KEY_BN_PRICE, this.onBinancePriceUpdate)
+        eventBus.off(EVENT_KEY_UPDATE_PRICE, this.onBinancePriceUpdate)
     }
 
     protected onBinancePriceUpdate({ symbol, price, volume, time }: { symbol: string, price: number, volume: number, time: number }) {
