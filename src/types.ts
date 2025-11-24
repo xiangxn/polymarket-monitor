@@ -82,7 +82,10 @@ export interface Position {
     entryPrice: number;
     size: number;
     currentPrice: number;
+    // 止损价
     stopLoss: number;
+    // 止损确认时间
+    stopLossTime?: number;
     timestamp: number;
     realizedPnL?: number;
 

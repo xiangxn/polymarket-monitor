@@ -87,11 +87,11 @@ export function addPosition(position: Position): Position {
         pos.currentPrice = position.currentPrice;
         pos.size += position.size;
         pos.realizedPnL = (pos.currentPrice - pos.entryPrice) * pos.size;
-        pos.stopLoss = pos.entryPrice * (1 - config.STOP_LOSS_PERCENTAGE);
+        pos.stopLoss = pos.entryPrice * (1 - Math.abs(config.STOP_LOSS_THRESHOLD));
     } else {
         positions.set(position.tokenId, { ...position });
         pos = positions.get(position.tokenId)!;
-        pos.stopLoss = pos.entryPrice * (1 - config.STOP_LOSS_PERCENTAGE);
+        pos.stopLoss = pos.entryPrice * (1 - Math.abs(config.STOP_LOSS_THRESHOLD));
     }
     return pos!
 }

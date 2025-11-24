@@ -30,7 +30,7 @@ export class MarketMonitor extends EventEmitter {
     private binanceWS: WebSocket | null = null;
     private polyliveWS: WebSocket | null = null;
     private polyclobWS: WebSocket | null = null;
-    private fetchPriceQueue = new PQueue({ concurrency: 1, interval: 5_000 })
+    private fetchPriceQueue = new PQueue({ concurrency: 1, interval: 3_000 })
     private lastClobMsgTime = 0
     private lastClobCheck = false
     private readonly POLY_LIVE_BASE = 'wss://ws-live-data.polymarket.com';
@@ -418,7 +418,7 @@ export class MarketMonitor extends EventEmitter {
                 token.bid = update.bids.length > 0 ? { price: parseFloat(update.bids[bidIndex].price), size: parseFloat(update.bids[bidIndex].size) } : { price: 0, size: 0 };
                 token.ask = update.asks.length > 0 ? { price: parseFloat(update.asks[askIndex].price), size: parseFloat(update.asks[askIndex].size) } : { price: 0, size: 0 };
 
-                eventBus.emit(EVENT_KEY_POLYMARKET_PRICE, market)
+                eventBus.emit(EVENT_KEY_POLYMARKET_PRICE, { market, token })
             } else if (event_type === 'last_trade_price') {
                 const market = this.marketMap.get(update.market)
                 if (!market) return
