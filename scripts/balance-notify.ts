@@ -284,7 +284,7 @@ class BalanceMonitor {
 
         // 为每个地址生成报告
         Object.entries(balancesByAddress).forEach(([address, tokenBalances]) => {
-            message += `<b>地址:</b> ${address}\n`;
+            message += `<b>地址:</b> <a href="https://polygonscan.com/address/${address}">${address}</a>\n`;
 
             tokenBalances.forEach(token => {
                 if (parseFloat(token.balanceFormatted) > 0) {
