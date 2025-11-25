@@ -286,6 +286,9 @@ export class CryptoPriceStrategy {
             // 订单金额限制
             const size = Math.min(market.tokens[0].ask.size * market.tokens[0].ask.price, this.config.MAX_ORDER_SIZE)
             if (size < this.config.MIN_ORDER_SIZE) return    // size太小，不操作
+            // 风控过滤
+            const cash = getCash()
+            if (cash - size < this.config.MIN_BALANCE) return
 
             console.info("=== DECISION: BUY UP", JSON.stringify({ tokenId: market.tokens[0].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
             // place order via Polymarket CLOB REST / relayer.
@@ -312,6 +315,9 @@ export class CryptoPriceStrategy {
             // 订单金额限制
             const size = Math.min(market.tokens[1].ask.size * market.tokens[1].ask.price, this.config.MAX_ORDER_SIZE)
             if (size < this.config.MIN_ORDER_SIZE) return
+            // 风控过滤
+            const cash = getCash()
+            if (cash - size < this.config.MIN_BALANCE) return
 
             console.info("=== DECISION: BUY DOWN", JSON.stringify({ tokenId: market.tokens[1].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
             // place order...
@@ -343,13 +349,6 @@ export class CryptoPriceStrategy {
 
         const win30 = this.win30Map.get(symbol)
         if (!win30) return
-
-        // 风控过滤
-        const cash = getCash()
-        if (cash <= this.config.MIN_BALANCE) {
-            // console.info(`[strategy] 到达止损位置, 不进行扫尾盘检查`)
-            return
-        }
 
         // 防抖处理
         let item = this.calcState.get(market.conditionId);
