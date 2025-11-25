@@ -107,7 +107,7 @@ async function main() {
 
     // 每秒刷新 UI
     while (running) {
-        renderTable();
+        // renderTable();
         await sleep(1)
     }
 }
