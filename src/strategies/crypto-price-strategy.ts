@@ -49,6 +49,7 @@ export class CryptoPriceStrategy {
     }
 
     public start() {
+        console.info(`CryptoPriceStrategy start...`)
         eventBus.on(`${EVENT_KEY_MARKET_START}:${this.eventType}`, this.onMarketStart)
         eventBus.on(EVENT_KEY_MARKET_RESOLVED, this.onMarketResolved)
         eventBus.on(EVENT_KEY_POLYMARKET_PRICE, this.onMarketPriceUpdate)
@@ -60,6 +61,7 @@ export class CryptoPriceStrategy {
         eventBus.off(EVENT_KEY_MARKET_RESOLVED, this.onMarketResolved)
         eventBus.off(EVENT_KEY_POLYMARKET_PRICE, this.onMarketPriceUpdate)
         eventBus.off(EVENT_KEY_UPDATE_PRICE, this.onPriceUpdate)
+        console.info(`CryptoPriceStrategy stopped.`)
     }
 
     protected onPriceUpdate({ symbol, price, volume, time }: { symbol: string, price: number, volume: number, time: number }) {

@@ -17,8 +17,8 @@ import { calculateTimeToEnd, formatTimeFromMs } from './helper';
 import { getCash, getPositions, initPositions, savePositions } from './position';
 import { initOrderQueue } from './order-queue';
 
-import './strategy'; // 启动策略监听
-import { PriceMonitor } from './price-monitor';
+import { MarketMonitor } from './market-monitor';
+import { CryptoPriceStrategy } from "./strategies/crypto-price-strategy";
 
 
 
@@ -26,15 +26,15 @@ async function main() {
 
     const manager = UpdateManager.getInstance();
 
-    const monitor = new EventMonitor();
+    const marketMonitor = new MarketMonitor();
     const userMonitor = new UserMonitor();
-    const priceMonitor = new PriceMonitor();
+    const fifteenStrategy = new CryptoPriceStrategy();
 
     process.on('SIGINT', async () => {
         console.info('SIGINT received — shutting down gracefully...');
-        await priceMonitor.stop()
+        fifteenStrategy.stop()
         await userMonitor.stop()
-        await monitor.stop();
+        await marketMonitor.stop();
         await savePositions();
         process.exit(0);
     });
@@ -43,7 +43,7 @@ async function main() {
         // positions
         const cash = getCash()
         const positions = getPositions()
-        const events = monitor.getEvents()
+        const events = marketMonitor.getEvents()
         const pt = new Table({
             wordWrap: true,
             head: [
@@ -75,8 +75,7 @@ async function main() {
                 "volume",
                 "endsIn",
                 "tradeCount",
-                "negRisk",
-                "yesPrices"
+                "negRisk"
             ],
         });
 
@@ -88,7 +87,6 @@ async function main() {
                 timeToEnd < 0 ? "00:00:00" : formatTimeFromMs(timeToEnd),
                 e.tradeCount ?? 0,
                 e.negRisk ? "Y" : "N",
-                e.markets.map((m, i) => ((i + 1) % 5 === 0 ? `${m.tokens[0].ask.price}\n` : `${m.tokens[0].ask.price ?? 0}`)).join(",")
             ]);
         });
         const data = `Cash:${cash}\nPositions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
@@ -103,9 +101,9 @@ async function main() {
     // 加载 positions
     await initPositions();
     await initOrderQueue();
+    fifteenStrategy.start();
     userMonitor.start();
-    priceMonitor.start();
-    await monitor.start();
+    marketMonitor.start();
     clearInterval(interval);
     manager.unhook(false);
 }

@@ -2,7 +2,7 @@
   "name": "polymarket-bot",
   "packageManager": "yarn@4.10.3",
   "scripts": {
-    "dev": "NODE_ENV=development ts-node src/fifteen.ts",
+    "dev": "NODE_ENV=development ts-node src/main.ts",
     "test": "ts-node tests/test.ts",
     "build": "tsc",
     "start": "NODE_ENV=production node dist/src/main.js",

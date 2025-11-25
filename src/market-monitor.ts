@@ -1,5 +1,5 @@
 import { chunkArray, dirExists, sleep } from "./helper";
-import { CryptoPriceSymbol, CryptoPriceUint, PolymarketMarket } from "./types";
+import { CryptoPriceSymbol, CryptoPriceUint, PolymarketEvent, PolymarketMarket } from "./types";
 import { ConfigType, getConfig } from './config';
 import { SocksProxyAgent } from "socks-proxy-agent";
 import WebSocket from 'ws';
@@ -426,6 +426,12 @@ export class MarketMonitor extends EventEmitter {
                 const token = market.tokens.find((t: any) => t.tokenId === update.asset_id);
                 if (!token) return;
 
+                const trade = update as any;
+                const event = (market as any).events[0]
+                const vol = parseFloat(trade.size) * parseFloat(trade.price);
+                event.volume = (event.volume || 0) + vol;
+                event.tradeCount = (event.tradeCount || 0) + 1;
+
                 token.price = parseFloat(update.price);
                 if (update.side.toUpperCase() === 'BUY') {
                     token.lastBuy.push({ time: Date.now(), price: parseFloat(update.price), size: parseFloat(update.size) });
@@ -594,5 +600,16 @@ export class MarketMonitor extends EventEmitter {
         return this.fetchPriceQueue.add(() => {
             return fetchCryptoPrice(symbol, startTime, endTime, unit, retries)
         })
+    }
+
+    public getEvents() {
+        const events: PolymarketEvent[] = []
+        this.marketMap.forEach(m => {
+            const mk = m as any
+            if (mk.events && mk.events.length > 0) {
+                events.push(mk.events[0])
+            }
+        })
+        return events
     }
 }
