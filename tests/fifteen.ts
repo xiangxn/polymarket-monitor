@@ -3,13 +3,13 @@ import { resolve } from "path";
 
 dotenvConfig({ path: resolve(__dirname, `../${process.env.ENV_FILE || ''}.env`) });
 
-import { initEncryptor } from "./config";
+import { initEncryptor } from "../src/config";
 initEncryptor()
 
-import './utils/console'
+import '../src/utils/console'
 
-import { MarketMonitor } from './market-monitor';
-import { CryptoPriceStrategy } from "./strategies/crypto-price-strategy";
+import { MarketMonitor } from '../src/market-monitor';
+import { CryptoPriceStrategy } from "../src/strategies/crypto-price-strategy";
 
 
 

@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import { fetchMarketBySlug, PolymarketClient, searchPositions } from './polymarket';
 import { getConfig } from './config';
-import { chunkArray, sleep } from './helper';
+import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
 import { setCash } from './position';
 import { SocksProxyAgent } from 'socks-proxy-agent';

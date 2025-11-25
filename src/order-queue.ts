@@ -4,7 +4,7 @@ import { addCash, addPosition, getCash, getPositions, hasPosition, subCash, subP
 import fs from "fs/promises";
 import path from "path";
 import { eventBus } from './event-bus';
-import { dirExists, fileExists } from './helper';
+import { dirExists, fileExists } from './utils/helper';
 import { PolymarketClient } from './polymarket';
 import { Side } from '@polymarket/clob-client';
 

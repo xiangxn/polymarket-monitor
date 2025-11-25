@@ -1,4 +1,4 @@
-import { chunkArray, dirExists, sleep } from "./helper";
+import { chunkArray, dirExists, sleep } from "./utils/helper";
 import { CryptoPriceSymbol, CryptoPriceUint, PolymarketEvent, PolymarketMarket } from "./types";
 import { ConfigType, getConfig } from './config';
 import { SocksProxyAgent } from "socks-proxy-agent";
@@ -115,6 +115,7 @@ export class MarketMonitor extends EventEmitter {
         this.off(EVENT_KEY_POLYLIVE_MARKET, this.onPolyLiveMessage)
         // 等几个 tick 让 pending things 收尾
         await new Promise(res => setTimeout(res, 500));
+        console.info('MarketMonitor stopped.');
     }
 
 
