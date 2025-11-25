@@ -573,11 +573,11 @@ export class MarketMonitor extends EventEmitter {
         while (this.running) {
             // 获取新的市场数据
             const endDateMin = new Date()
-            endDateMin.setMinutes(endDateMin.getMinutes() + 7)  // 最早7分钟后结束
+            endDateMin.setMinutes(endDateMin.getMinutes() + this.config.SEARCH_START_TIME)  // 最早7分钟后结束
             endDateMin.setSeconds(0)
             endDateMin.setMilliseconds(0)
-            const endDateMax = new Date(endDateMin.getTime())
-            endDateMax.setDate(endDateMax.getDate() + 7)    // 最晚1周后结束
+            const endDateMax = new Date()
+            endDateMax.setMinutes(endDateMax.getMinutes() + this.config.SEARCH_END_TIME)    // 最晚1周后结束
             const markets = await searchMarkets(endDateMin, endDateMax)
             if (markets) {
                 markets.forEach(m => {

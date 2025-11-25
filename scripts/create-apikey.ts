@@ -43,15 +43,20 @@ export async function createBuilderApiKey(wallet: Wallet, creds: ApiKeyCreds) {
 export async function createEnv(funderAddr: string, ownerPri: string, apikey: ApiKeyCreds, builderApikey: ApiKeyCreds, encryptor: Encryptor, envName: string) {
     const env = {
         MIN_BALANCE: 140,
-        MIN_VOLUME: 1000,
-        SEARCH_START_TIME: 0,
-        SEARCH_END_TIME: 5,
-
         MAX_ORDER_SIZE: 5,
-        ENTER_WINDOW: "[0.85,0.95]",
-        MIN_END_TIME: 20,
 
-        RELATIVE_PRICE_CHANGE:0.002,
+        TAKE_PROFIT_PERCENTAGE: 0.45,
+        TAKE_PROFIT_PRICE: 0.93,
+        TAKE_PROFIT_MIN_TIME: 120,
+        TAKE_PROFIT_DISTANCE_PCT: 0.005,
+
+        STOP_LOSS_THRESHOLD: -0.45,
+        STOP_LOSS_LOGIC_TIME_THRESHOLD: 30000,
+        STOP_LOSS_TIME_LAST: 180000,
+        STOP_LOSS_TIME_DISTANCE_PCT: 0.001,
+
+
+
         FUNDER_ADDRESS: funderAddr,
         OWNER_ADDRESS_PRI: encryptor.encrypt(ownerPri),
         CLOB_API_KEY: encryptor.encrypt(apikey.key),
