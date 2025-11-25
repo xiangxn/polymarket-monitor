@@ -266,7 +266,7 @@ class BalanceMonitor {
 
     // 发送Telegram消息
     async sendTelegramMessage(message: string): Promise<void> {
-        await sendAlert(message)
+        await sendAlert(message, true)
     }
 
     // 格式化余额报告
