@@ -4,7 +4,7 @@ import UpdateManager from 'stdout-update';
 import { config as dotenvConfig } from "dotenv";
 import { resolve } from "path";
 
-dotenvConfig({ path: resolve(__dirname, `../${process.env.ENV_FILE || ''}.env`) });
+dotenvConfig({ path: resolve(__dirname, `../${process.env.ENV_FILE || 'v2'}.env`) });
 
 import { initEncryptor } from "./config";
 initEncryptor()
@@ -85,7 +85,7 @@ async function main() {
             const timeToEnd = calculateTimeToEnd(e.endDate);
             et.push([
                 `${e.title}[${e.id}]`,
-                e.volume.toLocaleString(),
+                e.volume?.toLocaleString() ?? 0,
                 timeToEnd < 0 ? "00:00:00" : formatTimeFromMs(timeToEnd),
                 e.tradeCount ?? 0,
                 e.negRisk ? "Y" : "N",
@@ -107,7 +107,11 @@ async function main() {
 
     // 每秒刷新 UI
     while (running) {
-        renderTable();
+        try {
+            renderTable();
+        } catch (err) {
+            console.error('renderTable error:', err);
+        }
         await sleep(1)
     }
 }

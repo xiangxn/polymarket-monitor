@@ -608,6 +608,9 @@ export class MarketMonitor extends EventEmitter {
         this.marketMap.forEach(m => {
             const mk = m as any
             if (mk.events && mk.events.length > 0) {
+                if (!mk.events[0].volume) {
+                    mk.events[0].volume = mk.volume ?? 0
+                }
                 events.push(mk.events[0])
             }
         })
