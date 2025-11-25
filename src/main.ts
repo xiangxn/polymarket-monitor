@@ -96,8 +96,8 @@ async function main() {
     }
 
     // 清除控制台
-    // console.clear()
-    // manager.hook()
+    console.clear()
+    manager.hook()
     // 加载 positions
     await initPositions();
     await initOrderQueue();
@@ -107,7 +107,7 @@ async function main() {
 
     // 每秒刷新 UI
     while (running) {
-        // renderTable();
+        renderTable();
         await sleep(1)
     }
 }
