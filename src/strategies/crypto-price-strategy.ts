@@ -4,7 +4,7 @@ import { MarketMonitor } from "../market-monitor";
 import { getEventByMarket, getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from "../polymarket";
 import { secondsLeft } from "../utils/math";
 import { ConfigType, getConfig } from "../config";
-import { hasPosition, onPriceUpdate } from "../position";
+import { getCash, hasPosition, onPriceUpdate } from "../position";
 import { enqueueOrder } from "../order-queue";
 
 export class CryptoPriceStrategy {
@@ -337,6 +337,13 @@ export class CryptoPriceStrategy {
 
         const win30 = this.win30Map.get(symbol)
         if (!win30) return
+
+        // 风控过滤
+        const cash = getCash()
+        if (cash <= this.config.MIN_BALANCE) {
+            // console.info(`[strategy] 到达止损位置, 不进行扫尾盘检查`)
+            return
+        }
 
         // 防抖处理
         let item = this.calcState.get(market.conditionId);
