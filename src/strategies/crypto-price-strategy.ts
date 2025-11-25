@@ -284,6 +284,9 @@ export class CryptoPriceStrategy {
             // 盘口差
             if (bestYesBid - bestNoAsk > this.config.MAX_BOOK_DIFF) return
 
+            const size = Math.min(market.tokens[0].ask.size * market.tokens[0].ask.price, this.config.MAX_ORDER_SIZE)
+            if (size < this.config.MIN_ORDER_SIZE) return    // size太小，不操作
+
             console.info("=== DECISION: BUY UP", JSON.stringify({ tokenId: market.tokens[0].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
             // place order via Polymarket CLOB REST / relayer.
             enqueueOrder({
@@ -292,7 +295,7 @@ export class CryptoPriceStrategy {
                 conditionId: market.conditionId,
                 marketId: market.id,
                 tokenId: market.tokens[0].tokenId,
-                amount: +market.tokens[0].ask.size.toFixed(4),
+                amount: +size.toFixed(4),
                 price: market.tokens[0].ask.price,
                 outcome: market.tokens[0].outcome
             })
@@ -307,6 +310,9 @@ export class CryptoPriceStrategy {
             // 盘口差
             if (bestNoBid - bestYesAsk > this.config.MAX_BOOK_DIFF) return
 
+            const size = Math.min(market.tokens[1].ask.size * market.tokens[1].ask.price, this.config.MAX_ORDER_SIZE)
+            if (size < this.config.MIN_ORDER_SIZE) return
+
             console.info("=== DECISION: BUY DOWN", JSON.stringify({ tokenId: market.tokens[1].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
             // place order...
             enqueueOrder({
@@ -315,7 +321,7 @@ export class CryptoPriceStrategy {
                 conditionId: market.conditionId,
                 marketId: market.id,
                 tokenId: market.tokens[1].tokenId,
-                amount: +market.tokens[1].ask.size.toFixed(4),
+                amount: +size.toFixed(4),
                 price: market.tokens[1].ask.price,
                 outcome: market.tokens[1].outcome
             })
