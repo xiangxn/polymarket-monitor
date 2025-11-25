@@ -544,3 +544,8 @@ export function getUnitBySeriesSlug(slug: string) {
     return TIME_UNIT_MAP[arr[arr.length - 1]] as CryptoPriceUint
 }
 
+export function getEventByMarket(market: PolymarketMarket) {
+    const m = market as any;
+    if (m.events && m.events.length > 0) return m.events[0] as PolymarketEvent
+    return null
+}

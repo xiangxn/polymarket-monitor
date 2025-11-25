@@ -1,10 +1,11 @@
 import { CryptoPriceSymbol, PolymarketMarket, SlidingWindow, Token } from "../types"
 import { eventBus, EVENT_KEY_POLYMARKET_PRICE, EVENT_KEY_UPDATE_PRICE, EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START } from '../event-bus';
 import { MarketMonitor } from "../market-monitor";
-import { getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from "../polymarket";
+import { getEventByMarket, getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from "../polymarket";
 import { secondsLeft } from "../utils/math";
 import { ConfigType, getConfig } from "../config";
-import { addPosition, delPosition, hasPosition, onPriceUpdate, subPosition } from "../position";
+import { hasPosition, onPriceUpdate } from "../position";
+import { enqueueOrder } from "../order-queue";
 
 export class CryptoPriceStrategy {
 
@@ -95,8 +96,17 @@ export class CryptoPriceStrategy {
                 // 如果即将结束，则不止盈，减少滑点损失
                 if (timeLeft <= this.config.TAKE_PROFIT_MIN_TIME && distancePCT >= this.config.TAKE_PROFIT_DISTANCE_PCT) return
 
-                console.warn(`=== DECISION: TAKE PROFIT [${token.outcome}] ${token.tokenId} ${position.entryPrice} -> ${token.bid.price}`)
-                delPosition(token.tokenId)
+                console.info(`=== DECISION: TAKE PROFIT [${token.outcome}] ${token.tokenId} ${position.entryPrice} -> ${token.bid.price}, ${token.bid.price}`)
+                enqueueOrder({
+                    type: 'sell',
+                    conditionId: market.conditionId,
+                    eventId: getEventByMarket(market)?.id ?? '0',
+                    tokenId: token.tokenId,
+                    amount: position.size,
+                    price: token.bid.price,
+                    marketId: market.id,
+                    outcome: token.outcome
+                })
                 return
             }
 
@@ -104,8 +114,17 @@ export class CryptoPriceStrategy {
             // 最高优先级, 硬止损
             const stopLossPCT = (token.price - position.entryPrice) / position.entryPrice
             if (stopLossPCT < this.config.STOP_LOSS_THRESHOLD) {
-                console.warn(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossPCT:${stopLossPCT}, ${position.entryPrice} -> ${token.price}`)
-                delPosition(token.tokenId)
+                console.info(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossPCT:${stopLossPCT}, ${position.entryPrice} -> ${token.price}, ${token.bid.price}`)
+                enqueueOrder({
+                    type: 'sell',
+                    conditionId: market.conditionId,
+                    eventId: getEventByMarket(market)?.id ?? '0',
+                    tokenId: token.tokenId,
+                    amount: position.size,
+                    price: token.bid.price,
+                    marketId: market.id,
+                    outcome: token.outcome
+                })
                 return
             }
 
@@ -116,8 +135,17 @@ export class CryptoPriceStrategy {
                         position.stopLossTime = Date.now()
                     }
                     if (Date.now() - position.stopLossTime >= this.config.STOP_LOSS_LOGIC_TIME_THRESHOLD) {
-                        console.warn(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossTime:${Date.now() - position.stopLossTime} ${position.entryPrice} -> ${token.price}`)
-                        delPosition(token.tokenId)
+                        console.info(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossTime:${Date.now() - position.stopLossTime} ${position.entryPrice} -> ${token.price}, ${token.bid.price}`)
+                        enqueueOrder({
+                            type: 'sell',
+                            conditionId: market.conditionId,
+                            eventId: getEventByMarket(market)?.id ?? '0',
+                            tokenId: token.tokenId,
+                            amount: position.size,
+                            price: token.bid.price,
+                            marketId: market.id,
+                            outcome: token.outcome
+                        })
                         return
                     }
                 } else {
@@ -129,8 +157,17 @@ export class CryptoPriceStrategy {
                         position.stopLossTime = Date.now()
                     }
                     if (Date.now() - position.stopLossTime >= this.config.STOP_LOSS_LOGIC_TIME_THRESHOLD) {
-                        console.warn(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossTime:${Date.now() - position.stopLossTime} ${position.entryPrice} -> ${token.price}`)
-                        delPosition(token.tokenId)
+                        console.info(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossTime:${Date.now() - position.stopLossTime} ${position.entryPrice} -> ${token.price}, ${token.bid.price}`)
+                        enqueueOrder({
+                            type: 'sell',
+                            conditionId: market.conditionId,
+                            eventId: getEventByMarket(market)?.id ?? '0',
+                            tokenId: token.tokenId,
+                            amount: position.size,
+                            price: token.bid.price,
+                            marketId: market.id,
+                            outcome: token.outcome
+                        })
                         return
                     }
                 } else {
@@ -142,14 +179,32 @@ export class CryptoPriceStrategy {
             if (timeLeft < this.config.STOP_LOSS_TIME_LAST) {
                 if (index === 0) { // UP
                     if (nowPrice < openPrice && distancePCT > this.config.STOP_LOSS_TIME_DISTANCE_PCT) {
-                        console.warn(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} distancePCT:${distancePCT}, timeLeft:${timeLeft} ${position.entryPrice} -> ${token.price}`)
-                        delPosition(token.tokenId)
+                        console.info(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} distancePCT:${distancePCT}, timeLeft:${timeLeft} ${position.entryPrice} -> ${token.price}, ${token.bid.price}`)
+                        enqueueOrder({
+                            type: 'sell',
+                            conditionId: market.conditionId,
+                            eventId: getEventByMarket(market)?.id ?? '0',
+                            tokenId: token.tokenId,
+                            amount: position.size,
+                            price: token.bid.price,
+                            marketId: market.id,
+                            outcome: token.outcome
+                        })
                         return
                     }
                 } else {    // DOWN
                     if (nowPrice > openPrice && distancePCT > this.config.STOP_LOSS_TIME_DISTANCE_PCT) {
-                        console.warn(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} distancePCT:${distancePCT}, timeLeft:${timeLeft} ${position.entryPrice} -> ${token.price}`)
-                        delPosition(token.tokenId)
+                        console.info(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} distancePCT:${distancePCT}, timeLeft:${timeLeft} ${position.entryPrice} -> ${token.price}, ${token.bid.price}`)
+                        enqueueOrder({
+                            type: 'sell',
+                            conditionId: market.conditionId,
+                            eventId: getEventByMarket(market)?.id ?? '0',
+                            tokenId: token.tokenId,
+                            amount: position.size,
+                            price: token.bid.price,
+                            marketId: market.id,
+                            outcome: token.outcome
+                        })
                         return
                     }
                 }
@@ -227,20 +282,17 @@ export class CryptoPriceStrategy {
             // 盘口差
             if (bestYesBid - bestNoAsk > this.config.MAX_BOOK_DIFF) return
 
-            console.warn("=== DECISION: BUY UP", JSON.stringify({ tokenId: market.tokens[0].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
-            // place order via Polymarket CLOB REST / relayer (not included here). This demo only logs decision.
-            addPosition({
-                eventId: '',
+            console.info("=== DECISION: BUY UP", JSON.stringify({ tokenId: market.tokens[0].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
+            // place order via Polymarket CLOB REST / relayer.
+            enqueueOrder({
+                type: 'buy',
+                eventId: getEventByMarket(market)?.id ?? '0',
                 conditionId: market.conditionId,
                 marketId: market.id,
                 tokenId: market.tokens[0].tokenId,
-                outcome: market.tokens[0].outcome,
-                entryPrice: bestYesAsk,
-                currentPrice: bestYesAsk,
-                stopLoss: 0,
-                size: market.tokens[0].ask.size,
-                realizedPnL: 0,
-                timestamp: Date.now()
+                amount: +market.tokens[0].ask.size.toFixed(4),
+                price: market.tokens[0].ask.price,
+                outcome: market.tokens[0].outcome
             })
         }
 
@@ -253,20 +305,17 @@ export class CryptoPriceStrategy {
             // 盘口差
             if (bestNoBid - bestYesAsk > this.config.MAX_BOOK_DIFF) return
 
-            console.warn("=== DECISION: BUY DOWN", JSON.stringify({ tokenId: market.tokens[1].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
+            console.info("=== DECISION: BUY DOWN", JSON.stringify({ tokenId: market.tokens[1].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
             // place order...
-            addPosition({
-                eventId: '',
+            enqueueOrder({
+                type: 'buy',
+                eventId: getEventByMarket(market)?.id ?? '0',
                 conditionId: market.conditionId,
                 marketId: market.id,
                 tokenId: market.tokens[1].tokenId,
-                outcome: market.tokens[1].outcome,
-                entryPrice: bestNoAsk,
-                currentPrice: bestNoAsk,
-                stopLoss: 0,
-                size: market.tokens[1].ask.size,
-                realizedPnL: 0,
-                timestamp: Date.now()
+                amount: +market.tokens[1].ask.size.toFixed(4),
+                price: market.tokens[1].ask.price,
+                outcome: market.tokens[1].outcome
             })
         }
     }
