@@ -12,7 +12,7 @@ initEncryptor()
 import './utils/console'
 
 import { UserMonitor } from './user-monitor';
-import { calculateTimeToEnd, formatTimeFromMs } from './utils/helper';
+import { calculateTimeToEnd, formatTimeFromMs, sleep } from './utils/helper';
 import { getCash, getPositions, initPositions, savePositions } from './position';
 import { initOrderQueue } from './order-queue';
 
@@ -28,13 +28,16 @@ async function main() {
     const marketMonitor = new MarketMonitor();
     const userMonitor = new UserMonitor();
     const fifteenStrategy = new CryptoPriceStrategy();
+    let running = true
 
     process.on('SIGINT', async () => {
         console.info('SIGINT received — shutting down gracefully...');
+        running = false
         fifteenStrategy.stop()
         await userMonitor.stop()
         await marketMonitor.stop();
         await savePositions();
+        manager.unhook(false);
         process.exit(0);
     });
 
@@ -95,16 +98,18 @@ async function main() {
     // 清除控制台
     console.clear()
     manager.hook()
-    // 每秒刷新 UI
-    const interval = setInterval(renderTable, 1000);
     // 加载 positions
     await initPositions();
     await initOrderQueue();
     fifteenStrategy.start();
     userMonitor.start();
     marketMonitor.start();
-    clearInterval(interval);
-    manager.unhook(false);
+
+    // 每秒刷新 UI
+    while (running) {
+        renderTable();
+        await sleep(1)
+    }
 }
 
 main().catch(err => {
