@@ -21,13 +21,13 @@ export function initTelegramBot(token: string, chat_id: string, proxyUrl?: strin
     }
 }
 
-export async function sendAlert(message: string) {
+export async function sendAlert(message: string, closeView: boolean = false) {
     if (!bot || !chatId) {
         console.warn('[Telegram] Bot 未初始化，无法发送');
         return;
     }
 
-    return bot.sendMessage(chatId, message, { parse_mode: 'HTML' }).catch((err) => {
+    return bot.sendMessage(chatId, message, { parse_mode: 'HTML', disable_web_page_preview: closeView }).catch((err) => {
         console.error('[Telegram] 发送失败：', err.message);
     });
 }
