@@ -134,7 +134,8 @@ async function checkSignal(event: PolymarketEvent) {
         if (markets[0].tokens[0].ask.price - markets[1].tokens[0].ask.price > config.MIN_MARKET_SPREAD && checkWindow(markets[0].tokens[0].ask.price)) {
             // 可能存在扫尾盘机会
             const token = markets[0].tokens[0]
-            const size = Math.min(token.ask.size * token.ask.price, config.MAX_ORDER_SIZE)
+            let size = Math.min(token.ask.size * token.ask.price, config.MAX_ORDER_SIZE)
+            size = Math.max(size, config.MIN_ORDER_SIZE)
             if (size < config.MIN_ORDER_SIZE) return    // size太小，不操作
 
             if (checkBuy(token)) {
@@ -159,7 +160,8 @@ async function checkSignal(event: PolymarketEvent) {
                 if (Math.abs(spread) > config.MIN_MARKET_SPREAD && checkWindow(m.tokens[index].ask.price)) {
                     // 可能存在扫尾盘机会
                     const token = m.tokens[index]
-                    const size = Math.min(token.ask.size * token.ask.price, config.MAX_ORDER_SIZE)
+                    let size = Math.min(token.ask.size * token.ask.price, config.MAX_ORDER_SIZE)
+                    size = Math.max(size, config.MIN_ORDER_SIZE)
                     if (size < config.MIN_ORDER_SIZE) return    // size太小不操作
 
                     if (checkBuy(token)) {
