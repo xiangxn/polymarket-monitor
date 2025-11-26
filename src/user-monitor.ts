@@ -171,7 +171,7 @@ export class UserMonitor {
                     await sleep(1)
                 }
                 if (positions.length === 0) {
-                    clearPositions()
+                    // clearPositions()
                 }
                 await sleep(20)
             } catch (err) {
