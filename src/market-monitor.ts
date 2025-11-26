@@ -306,6 +306,7 @@ export class MarketMonitor extends EventEmitter {
     public subscribeMarket(m?: PolymarketMarket | string) {
         if (!m) {
             this.clearSubsTokens()
+            if (this.subsTokens.size < 1) return
             const msg = { type: 'MARKET', assets_ids: Array.from(this.subsTokens) }
             if (this.polyclobWS && this.polyclobWS.readyState === WebSocket.OPEN && this.subsTokens.size > 0) {
                 this.polyclobWS.send(JSON.stringify(msg), (err?: Error) => {
