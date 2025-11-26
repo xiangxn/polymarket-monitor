@@ -434,7 +434,7 @@ export class MarketMonitor extends EventEmitter {
                 const trade = update as any;
                 const event = (market as any).events[0]
                 const vol = parseFloat(trade.size) * parseFloat(trade.price);
-                event.volume = (event.volume || 0) + vol;
+                event.volume = +((event.volume || 0) + vol).toFixed(2);
                 event.tradeCount = (event.tradeCount || 0) + 1;
 
                 token.price = parseFloat(update.price);
