@@ -222,7 +222,7 @@ export class MarketMonitor extends EventEmitter {
 
             let backoffMs = this.reconnectBaseMs;
             // 否则我们需要重连（带退避）
-            console.debug(`PolyLive WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
+            console.warn(`PolyLive WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
             this.pinging = false
             setTimeout(() => {
                 backoffMs = Math.min(backoffMs * 1.5, this.reconnectMaxMs);
@@ -277,7 +277,7 @@ export class MarketMonitor extends EventEmitter {
 
             let backoffMs = this.reconnectBaseMs;
             // 否则我们需要重连（带退避）
-            console.debug(`PolyClob WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
+            console.warn(`PolyClob WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
             this.pingingClob = false
             setTimeout(() => {
                 backoffMs = Math.min(backoffMs * 1.5, this.reconnectMaxMs);

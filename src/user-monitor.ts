@@ -87,7 +87,7 @@ export class UserMonitor {
 
             let backoffMs = this.reconnectBaseMs;
             // 否则我们需要重连（带退避）
-            console.debug(`User WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
+            console.warn(`User WS closed unexpectedly. Reconnecting in ${backoffMs}ms...`);
             this.pinging = false
             setTimeout(() => {
                 backoffMs = Math.min(backoffMs * 1.5, this.reconnectMaxMs);
