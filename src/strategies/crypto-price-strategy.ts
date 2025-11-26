@@ -284,7 +284,8 @@ export class CryptoPriceStrategy {
             // 盘口差
             if (bestYesBid - bestNoAsk > this.config.MAX_BOOK_DIFF) return
             // 订单金额限制
-            const size = Math.min(market.tokens[0].ask.size * market.tokens[0].ask.price, this.config.MAX_ORDER_SIZE)
+            let size = Math.min(market.tokens[0].ask.size * market.tokens[0].ask.price, this.config.MAX_ORDER_SIZE)
+            size = Math.max(size, this.config.MIN_ORDER_SIZE)
             if (size < this.config.MIN_ORDER_SIZE) return    // size太小，不操作
             // 风控过滤
             const cash = getCash()
@@ -313,7 +314,8 @@ export class CryptoPriceStrategy {
             // 盘口差
             if (bestNoBid - bestYesAsk > this.config.MAX_BOOK_DIFF) return
             // 订单金额限制
-            const size = Math.min(market.tokens[1].ask.size * market.tokens[1].ask.price, this.config.MAX_ORDER_SIZE)
+            let size = Math.min(market.tokens[1].ask.size * market.tokens[1].ask.price, this.config.MAX_ORDER_SIZE)
+            size = Math.max(size, this.config.MIN_ORDER_SIZE)
             if (size < this.config.MIN_ORDER_SIZE) return
             // 风控过滤
             const cash = getCash()
