@@ -445,6 +445,7 @@ export class MarketMonitor extends EventEmitter {
                     token.lastSell.push({ time: Date.now(), price: parseFloat(update.price), size: parseFloat(update.size) });
                     token.lastSell = token.lastSell.filter(t => t.time > Date.now() - this.config.KEEP_LAST_TRADE_TIME * 1000)
                 }
+                eventBus.emit(EVENT_KEY_POLYMARKET_PRICE, { market, token })
             }
         } catch (err) {
             console.warn('onPolyClobMessage error', err);
