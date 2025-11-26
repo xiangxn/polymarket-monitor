@@ -108,7 +108,7 @@ export class UserMonitor {
             try {
                 const data = JSON.parse(raw.data.toString());
 
-                if (!['trade', 'order'].includes(data.event_type)) return;
+                if (!['trade', 'order'].includes(data.event_type.toLowerCase())) return;
 
                 if (data.event_type === 'order') {
                     console.debug(`WS order: ${JSON.stringify(data)}`)
@@ -117,7 +117,7 @@ export class UserMonitor {
                 }
                 if (data.event_type === 'trade') {
                     console.debug(`WS trade: ${JSON.stringify(data)}`)
-                    if (data.status === 'MATCHED') {
+                    if (data.status === 'MINED') {  // MATCHED
                         eventBus.emit('order', {
                             asset_id: data.asset_id,
                             associate_trades: null,
