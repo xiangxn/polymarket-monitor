@@ -142,10 +142,14 @@ export class SlidingWindow {
     private arr: PPoint[] = [];
     private lastPPoint: PPoint = { ts: 0, price: 0 }
     private ms = 10_000;
+    private minDataCount = 3;
 
-    constructor(ms?: number) {
+    constructor(ms?: number, minDataCount?: number) {
         if (ms) {
             this.ms = ms
+        }
+        if (minDataCount) {
+            this.minDataCount = minDataCount
         }
     }
 
@@ -161,15 +165,23 @@ export class SlidingWindow {
         while (this.arr.length && now - this.arr[0].ts > ms) this.arr.shift();
     }
     avg(): number | null {
-        if (this.arr.length === 0) return null;
+        if (this.arr.length < this.minDataCount) return null; // 数据太少时返回空
         return this.arr.reduce((s, x) => s + x.price, 0) / this.arr.length;
+    }
+    first() {
+        if (!this.arr.length) return null;
+        return this.arr[0].price;
+    }
+    firstPoint() {
+        if (!this.arr.length) return null;
+        return this.arr[0];
     }
     last(): number | null {
         if (!this.arr.length) return null;
         return this.arr[this.arr.length - 1].price;
     }
     std(): number | null {
-        if (this.arr.length === 0) return null;
+        if (this.arr.length < this.minDataCount) return null;
         return std(computeReturns(this.arr.map(p => p.price)))
     }
 }
