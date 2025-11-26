@@ -119,3 +119,7 @@ export async function savePositions() {
     const poss = Array.from(positions.values());
     await fs.writeFile(path.join(dataDir, posFileName), JSON.stringify(poss, null, 2));
 }
+
+export function clearPositions() {
+    positions.clear()
+}

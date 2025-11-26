@@ -314,8 +314,11 @@ export class MarketMonitor extends EventEmitter {
                     }
                 })
                 console.debug(`Subscribed to market: ${JSON.stringify(msg)}`)
+                console.info(`monitor market count: ${this.marketMap.size}`)
+            } else {
+                console.warn(`Subscribe market failed: ${JSON.stringify(msg)}`)
             }
-            console.info(`monitor market count: ${this.marketMap.size}`)
+
         } else if (typeof m === 'string') {
             let market = this.marketMap.get(m)
             if (market) {

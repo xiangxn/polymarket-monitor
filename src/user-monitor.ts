@@ -3,7 +3,7 @@ import { fetchMarketBySlug, PolymarketClient, searchPositions } from './polymark
 import { getConfig } from './config';
 import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
-import { setCash } from './position';
+import { clearPositions, setCash } from './position';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { MetadataType } from './types';
 
@@ -169,6 +169,9 @@ export class UserMonitor {
                     // 处理mds,获取市场数据判断盈亏,补充order csv
                     await Promise.all(mds.map(md => this.checkProfitLoss(md)))
                     await sleep(1)
+                }
+                if (positions.length === 0) {
+                    clearPositions()
                 }
                 await sleep(20)
             } catch (err) {
