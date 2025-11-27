@@ -15,6 +15,8 @@ export interface PolymarketEvent {
 
     // 自定义字段
     tradeCount: number;
+    // yes方向的最后成交价格
+    yesPrice: number;
     // 事件的开盘价，用于计算
     openPrice: number;
     // 预测标的symbol

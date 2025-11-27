@@ -431,18 +431,22 @@ export class MarketMonitor extends EventEmitter {
                 const token = market.tokens.find((t: any) => t.tokenId === update.asset_id);
                 if (!token) return;
 
-                const trade = update as any;
+                const price = parseFloat(update.price)
+                const size = parseFloat(update.size)
                 const event = (market as any).events[0]
-                const vol = parseFloat(trade.size) * parseFloat(trade.price);
+                const vol = size * price;
                 event.volume = +((event.volume || 0) + vol).toFixed(2);
                 event.tradeCount = (event.tradeCount || 0) + 1;
+                token.price = price;
+                if (token.tokenId === market.tokens[0].tokenId) {
+                    event.yesPrice = price
+                }
 
-                token.price = parseFloat(update.price);
                 if (update.side.toUpperCase() === 'BUY') {
-                    token.lastBuy.push({ time: Date.now(), price: parseFloat(update.price), size: parseFloat(update.size) });
+                    token.lastBuy.push({ time: Date.now(), price, size });
                     token.lastBuy = token.lastBuy.filter(t => t.time > Date.now() - this.config.KEEP_LAST_TRADE_TIME * 1000)
                 } else {
-                    token.lastSell.push({ time: Date.now(), price: parseFloat(update.price), size: parseFloat(update.size) });
+                    token.lastSell.push({ time: Date.now(), price, size });
                     token.lastSell = token.lastSell.filter(t => t.time > Date.now() - this.config.KEEP_LAST_TRADE_TIME * 1000)
                 }
                 eventBus.emit(EVENT_KEY_POLYMARKET_PRICE, { market, token })
@@ -587,7 +591,7 @@ export class MarketMonitor extends EventEmitter {
             if (markets) {
                 markets.forEach(m => {
                     if (this.marketMap.has(m.conditionId)) return
-
+                    
                     if (m.closed === false && new Date(m.eventStartTime).getTime() <= Date.now() && new Date(m.endDate).getTime() > Date.now()) {
                         TAG_SLUGS.forEach(slug => {
                             const tag = m.tags?.find(t => t.slug === slug)

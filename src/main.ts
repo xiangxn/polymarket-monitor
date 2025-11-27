@@ -77,7 +77,8 @@ async function main() {
                 "volume",
                 "endsIn",
                 "tradeCount",
-                "negRisk"
+                "negRisk",
+                "yesPrice"
             ],
         });
 
@@ -89,6 +90,7 @@ async function main() {
                 timeToEnd < 0 ? "00:00:00" : formatTimeFromMs(timeToEnd),
                 e.tradeCount ?? 0,
                 e.negRisk ? "Y" : "N",
+                e.yesPrice ?? 0
             ]);
         });
         const data = `Polymarket V2\nCash:${cash}\nPositions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
