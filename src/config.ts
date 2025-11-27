@@ -39,7 +39,7 @@ export const getConfig = () => {
         MIN_BALANCE: parseFloat(process.env.MIN_BALANCE ?? "140"),  // 最小余额，小于此值不操作
         ENTRY_WINDOW_LOW: parseInt(process.env.ENTRY_WINDOW_LOW ?? "60"),  // seconds, 入场窗口最小值, 默认值1m
         ENTRY_WINDOW_HIGH: parseInt(process.env.ENTRY_WINDOW_HIGH ?? "600"),  // seconds, 入场窗口最大值, 默认值10m
-        TREND_THRESHOLD: parseFloat(process.env.TREND_THRESHOLD ?? "0.0006"),   // 趋势阈值 0.06% -> 0.0006
+        TREND_THRESHOLD: parseFloat(process.env.TREND_THRESHOLD ?? "0.0004"),   // 趋势阈值 0.04% -> 0.0004
         MIN_PRICE_DELTA_THRESHOLD: parseFloat(process.env.MIN_PRICE_DELTA_THRESHOLD ?? "0.0008"),   // 标的价格delta最小值 0.08% -> 0.0008
         MAX_PRICE_DELTA_THRESHOLD: parseFloat(process.env.MAX_PRICE_DELTA_THRESHOLD ?? "0.0035"),   // 标的价格delta最大值 0.35% -> 0.0035
         MAX_ENTRY_PRICE: parseFloat(process.env.MAX_ENTRY_PRICE ?? "0.7"),   // 最大入场价 0.7
