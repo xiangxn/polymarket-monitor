@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import { getConfig } from './config';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { sleep } from './helper';
+import { sleep } from './utils/helper';
 
 const config = getConfig();
 

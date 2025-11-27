@@ -1,5 +1,5 @@
 import { SocksProxyAgent } from "socks-proxy-agent";
-import { fetchWithProxy, sleep } from "./helper";
+import { fetchWithProxy, sleep } from "./utils/helper";
 import { CryptoPriceSymbol, CryptoPriceUint, MetadataType, PolymarketEvent, PostOrderResult, Token } from "./types";
 
 import { getConfig } from './config';

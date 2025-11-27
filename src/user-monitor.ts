@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
-import { fetchMarketBySlug, PolymarketClient, searchPositions } from './polymarket';
+import { PolymarketClient, searchPositions } from './polymarket';
 import { getConfig } from './config';
-import { chunkArray, sleep } from './helper';
+import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
 import { setCash } from './position';
 import { SocksProxyAgent } from 'socks-proxy-agent';
@@ -151,11 +151,11 @@ export class UserMonitor {
                 for (const chunk of chunks) {
                     const mds = await Promise.all(chunk.map(p => {
                         const metadata: MetadataType = {
-                            slug: p.slug,
                             market: p.conditionId,
                             token: p.asset,
                             outcome: p.outcome,
                             price: p.avgPrice,
+                            curPrice: p.curPrice,
                             size: p.size
                         }
                         if (p.negativeRisk === false) {
@@ -181,36 +181,23 @@ export class UserMonitor {
 
     async checkProfitLoss(md?: MetadataType) {
         if (!md) return
-        const { slug, market, token, outcome, size } = md
-        let { price } = md
-        const m = await fetchMarketBySlug(slug)
-        if (m && m.outcomePrices) {
-            const outcomePrices = JSON.parse(m.outcomePrices)
-            const index = outcomePrices.findIndex((p: string) => p === '1')
-            const clobTokenIds = JSON.parse(m.clobTokenIds)
-            const outcomeToken = clobTokenIds[index]
-            if (outcomeToken === token) {
-                price = 1
-            } else {
-                price = 0
-            }
-            eventBus.emit('order', {
-                asset_id: token,
-                associate_trades: null,
-                event_type: 'order',
-                id: 0,
-                market: market,     //	condition ID of market
-                order_owner: '',    //	owner of order
-                original_size: size,//	original order size
-                outcome: outcome,
-                owner: '',  //	owner of orders
-                price: price,
-                side: 'SELL',   //	BUY/SELL
-                size_matched: size,    //	size of order that has been matched
-                timestamp: Date.now(),
-                type: "UPDATE"
-            })
-        }
+        const { market, token, outcome, size, curPrice } = md
+        eventBus.emit('order', {
+            asset_id: token,
+            associate_trades: null,
+            event_type: 'order',
+            id: 0,
+            market: market,     //	condition ID of market
+            order_owner: '',    //	owner of order
+            original_size: size,//	original order size
+            outcome: outcome,
+            owner: '',  //	owner of orders
+            price: curPrice,
+            side: 'SELL',   //	BUY/SELL
+            size_matched: size,    //	size of order that has been matched
+            timestamp: Date.now(),
+            type: "UPDATE"
+        })
     }
 
     async checkBalance() {

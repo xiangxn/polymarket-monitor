@@ -13,7 +13,7 @@ import './utils/console'
 
 import { EventMonitor } from './event-monitor';
 import { UserMonitor } from './user-monitor';
-import { calculateTimeToEnd, formatTimeFromMs } from './helper';
+import { calculateTimeToEnd, formatTimeFromMs } from './utils/helper';
 import { getCash, getPositions, initPositions, savePositions } from './position';
 import { initOrderQueue } from './order-queue';
 

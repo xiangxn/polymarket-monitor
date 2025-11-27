@@ -125,10 +125,10 @@ export type CryptoPriceUint = 'fifteen' | 'hourly' | 'fourhour' | 'daily' | 'wee
 
 
 export interface MetadataType {
-    slug: string;
     market: string;
     token: string;
     outcome: string;
     price: number;
+    curPrice: number;
     size: number;
 }
