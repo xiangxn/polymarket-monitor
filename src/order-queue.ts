@@ -102,7 +102,7 @@ eventBus.on('order', async (order: OrderMessage) => {
             subCash(amount)
         } else if (side === 'SELL') {
             addCash(amount)
-            subPosition(order.asset_id, amount)
+            subPosition(order.asset_id, size)
         }
 
     }
