@@ -91,7 +91,7 @@ async function main() {
                 e.negRisk ? "Y" : "N",
             ]);
         });
-        const data = `Cash:${cash}\nPositions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
+        const data = `Polymarket V2\nCash:${cash}\nPositions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
         manager.update(data)
     }
 
