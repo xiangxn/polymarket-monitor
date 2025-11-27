@@ -1,9 +1,9 @@
 import WebSocket from 'ws';
-import { fetchMarketBySlug, PolymarketClient, searchPositions } from './polymarket';
+import { PolymarketClient, searchPositions } from './polymarket';
 import { getConfig } from './config';
 import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
-import { clearPositions, setCash } from './position';
+import { setCash } from './position';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { MetadataType } from './types';
 
@@ -169,9 +169,6 @@ export class UserMonitor {
                     // 处理mds,获取市场数据判断盈亏,补充order csv
                     await Promise.all(mds.map(md => this.checkProfitLoss(md)))
                     await sleep(1)
-                }
-                if (positions.length === 0) {
-                    // clearPositions()
                 }
                 await sleep(20)
             } catch (err) {
