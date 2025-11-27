@@ -176,6 +176,7 @@ export async function searchMarkets(endDateMin: Date, endDateMax: Date, slugs?: 
                 market.clobTokenIds = (typeof market.clobTokenIds === 'string') ? JSON.parse(market.clobTokenIds) : market.clobTokenIds;
                 market.outcomes = (typeof market.outcomes === 'string') ? JSON.parse(market.outcomes) : market.outcomes;
                 market.tokens = convertTokens(market)
+                market.volume = m.volumeNum ? m.volumeNum : parseFloat(m.volume)
                 return market
             })
         }
