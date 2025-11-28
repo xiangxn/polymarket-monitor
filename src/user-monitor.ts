@@ -195,7 +195,7 @@ export class UserMonitor {
             price: curPrice,
             side: 'SELL',   //	BUY/SELL
             size_matched: size,    //	size of order that has been matched
-            timestamp: Date.now(),
+            timestamp: Math.floor(Date.now() / 1000),
             type: "UPDATE"
         })
     }
