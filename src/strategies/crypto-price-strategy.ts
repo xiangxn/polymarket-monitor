@@ -136,7 +136,7 @@ export class CryptoPriceStrategy {
                     if (!position.stopLossTime) {
                         position.stopLossTime = Date.now()
                     }
-                    if (Date.now() - position.stopLossTime >= this.config.STOP_LOSS_LOGIC_TIME_THRESHOLD) {
+                    if (Date.now() - position.stopLossTime >= this.config.STOP_LOSS_LOGIC_TIME_THRESHOLD && distancePCT > this.config.STOP_LOSS_LOGIC_DISTANCE_PCT) {
                         console.info(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossTime:${Date.now() - position.stopLossTime} ${position.entryPrice} -> ${token.price}, ${token.bid.price}`)
                         enqueueOrder({
                             type: 'sell',
@@ -158,7 +158,7 @@ export class CryptoPriceStrategy {
                     if (!position.stopLossTime) {
                         position.stopLossTime = Date.now()
                     }
-                    if (Date.now() - position.stopLossTime >= this.config.STOP_LOSS_LOGIC_TIME_THRESHOLD) {
+                    if (Date.now() - position.stopLossTime >= this.config.STOP_LOSS_LOGIC_TIME_THRESHOLD && distancePCT > this.config.STOP_LOSS_LOGIC_DISTANCE_PCT) {
                         console.info(`=== DECISION: STOP LOSS [${token.outcome}] ${token.tokenId} stopLossTime:${Date.now() - position.stopLossTime} ${position.entryPrice} -> ${token.price}, ${token.bid.price}`)
                         enqueueOrder({
                             type: 'sell',
@@ -245,9 +245,7 @@ export class CryptoPriceStrategy {
         const win30 = this.win30Map.get(symbol)!
 
         // 相对开盘偏离
-        const p_open = openPrice
-        const p_now = nowPrice
-        const vol = Math.abs((p_now - p_open) / p_open);
+        const vol = Math.abs((nowPrice - openPrice) / openPrice);
         if (vol < this.config.MIN_PRICE_DELTA_THRESHOLD || vol > this.config.MAX_PRICE_DELTA_THRESHOLD) return
 
         // 10秒算术平均价格
@@ -272,11 +270,11 @@ export class CryptoPriceStrategy {
             trendScore: ${trendScore}, vol: ${vol}, bookDiff: ${bestYesBid - bestNoAsk}, ${bestNoBid - bestYesAsk}
             trendScore >= TREND_THRESHOLD[${this.config.TREND_THRESHOLD}]: ${trendScore >= this.config.TREND_THRESHOLD},${trendScore <= -this.config.TREND_THRESHOLD}
             (vol >= MIN_PRICE_DELTA_THRESHOLD[${this.config.MIN_PRICE_DELTA_THRESHOLD}] && vol <= MAX_PRICE_DELTA_THRESHOLD[${this.config.MAX_PRICE_DELTA_THRESHOLD}]): ${(vol >= this.config.MIN_PRICE_DELTA_THRESHOLD && vol <= this.config.MAX_PRICE_DELTA_THRESHOLD)}
-            (p_now >= p_open && p_now >= avg10 && avg10 >= avg30): ${(p_now >= p_open && p_now >= avg10 && avg10 >= avg30)}, ${(p_now < p_open && p_now <= avg10 && avg10 <= avg30)}
+            (nowPrice >= openPrice && nowPrice >= avg10 && avg10 >= avg30): ${(nowPrice >= openPrice && nowPrice >= avg10 && avg10 >= avg30)}, ${(nowPrice < openPrice && nowPrice <= avg10 && avg10 <= avg30)}
             volatility_10s > VOLATILITY_MARGIN[${this.config.VOLATILITY_MARGIN}] * volatility_30s: ${volatility_10s > this.config.VOLATILITY_MARGIN * volatility_30s}`)
 
         // BUY UP condition
-        if (trendScore >= this.config.TREND_THRESHOLD && (p_now >= p_open && p_now >= avg10 && avg10 >= avg30)) {
+        if (trendScore >= this.config.TREND_THRESHOLD && (nowPrice >= openPrice && nowPrice >= avg10 && avg10 >= avg30)) {
             // 持有仓位
             if (hasPosition(market.tokens[0].tokenId)) return
             // 入场限价
@@ -291,7 +289,7 @@ export class CryptoPriceStrategy {
             const cash = getCash()
             if (cash - size < this.config.MIN_BALANCE) return
 
-            console.info("=== DECISION: BUY UP", JSON.stringify({ tokenId: market.tokens[0].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
+            console.info("=== DECISION: BUY UP", JSON.stringify({ tokenId: market.tokens[0].tokenId, timeLeft, trendScore, nowPrice, openPrice, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
             // place order via Polymarket CLOB REST / relayer.
             enqueueOrder({
                 type: 'buy',
@@ -306,7 +304,7 @@ export class CryptoPriceStrategy {
         }
 
         // BUY DOWN condition
-        if (trendScore <= -this.config.TREND_THRESHOLD && (p_now < p_open && p_now <= avg10 && avg10 <= avg30)) {
+        if (trendScore <= -this.config.TREND_THRESHOLD && (nowPrice < openPrice && nowPrice <= avg10 && avg10 <= avg30)) {
             // 持有仓位
             if (hasPosition(market.tokens[1].tokenId)) return
             // 入场限价
@@ -321,7 +319,7 @@ export class CryptoPriceStrategy {
             const cash = getCash()
             if (cash - size < this.config.MIN_BALANCE) return
 
-            console.info("=== DECISION: BUY DOWN", JSON.stringify({ tokenId: market.tokens[1].tokenId, timeLeft, trendScore, p_now, p_open, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
+            console.info("=== DECISION: BUY DOWN", JSON.stringify({ tokenId: market.tokens[1].tokenId, timeLeft, trendScore, nowPrice, openPrice, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
             // place order...
             enqueueOrder({
                 type: 'buy',

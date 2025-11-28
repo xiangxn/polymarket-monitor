@@ -37,7 +37,7 @@ export const getConfig = () => {
 
         // 策略配置
         MIN_BALANCE: parseFloat(process.env.MIN_BALANCE ?? "140"),  // 最小余额，小于此值不操作
-        ENTRY_WINDOW_LOW: parseInt(process.env.ENTRY_WINDOW_LOW ?? "60"),  // seconds, 入场窗口最小值, 默认值1m
+        ENTRY_WINDOW_LOW: parseInt(process.env.ENTRY_WINDOW_LOW ?? "180"),  // seconds, 入场窗口最小值, 默认值1m
         ENTRY_WINDOW_HIGH: parseInt(process.env.ENTRY_WINDOW_HIGH ?? "600"),  // seconds, 入场窗口最大值, 默认值10m
         TREND_THRESHOLD: parseFloat(process.env.TREND_THRESHOLD ?? "0.0004"),   // 趋势阈值 0.04% -> 0.0004
         MIN_PRICE_DELTA_THRESHOLD: parseFloat(process.env.MIN_PRICE_DELTA_THRESHOLD ?? "0.0008"),   // 标的价格delta最小值 0.08% -> 0.0008
@@ -51,8 +51,9 @@ export const getConfig = () => {
         TAKE_PROFIT_DISTANCE_PCT: parseFloat(process.env.TAKE_PROFIT_DISTANCE_PCT || '0.005'), // 最后TAKE_PROFIT_MIN_TIME时间内如果价格差大于此值时不止盈
         STOP_LOSS_THRESHOLD: parseFloat(process.env.STOP_LOSS_THRESHOLD || '-0.45'),       // 硬止损比例, 默认值亏损45%
         STOP_LOSS_LOGIC_TIME_THRESHOLD: parseInt(process.env.STOP_LOSS_LOGIC_TIME_THRESHOLD || '20000'),  // 逻辑止损时间阈值, 默认值20s (价格翻转后20s内不止损), 单位ms
-        STOP_LOSS_TIME_LAST: parseInt(process.env.STOP_LOSS_TIME_LAST || '180000'),  // 时间止损, 最后3分钟时价离开盘价较远, 且亏损时止损, 默认值3m, 单位ms
-        STOP_LOSS_TIME_DISTANCE_PCT: parseFloat(process.env.STOP_LOSS_TIME_DISTANCE_PCT || '0.001'),  // 时间止损,时价格距离大于此值时止损,与STOP_LOSS_TIME_LAST并用 默认值0.01%
+        STOP_LOSS_LOGIC_DISTANCE_PCT: parseFloat(process.env.STOP_LOSS_LOGIC_DISTANCE_PCT || '0.0005'),   // 逻辑止损, 当价格已经翻转, 且价格差大于此值时, 且STOP_LOSS_LOGIC_TIME_THRESHOLD时间已经达到止损, 默认值0.0005%
+        STOP_LOSS_TIME_LAST: parseInt(process.env.STOP_LOSS_TIME_LAST || '120000'),  // 时间止损, 最后2分钟时价离开盘价较远, 且亏损时止损, 默认值2m, 单位ms
+        STOP_LOSS_TIME_DISTANCE_PCT: parseFloat(process.env.STOP_LOSS_TIME_DISTANCE_PCT || '0.001'),  // 时间止损时,价格距离大于此值时止损,与STOP_LOSS_TIME_LAST并用 默认值0.01%
 
         // build relayer client
         CHAIN_RPC_URL: process.env.CHAIN_RPC_URL || 'https://polygon-rpc.com',
