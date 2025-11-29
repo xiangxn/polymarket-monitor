@@ -1,4 +1,6 @@
 import { ethers } from 'ethers';
+import { readFile } from 'fs/promises';
+import { chunkArray, fetchWithProxy } from '../src/utils/helper';
 
 // ERC20合约ABI（简化版，只包含我们需要的方法）
 export const ERC20_ABI = [
@@ -157,4 +159,47 @@ export async function getBalancesBatch(provider: ethers.providers.JsonRpcProvide
     }
 
     return results;
+}
+
+export async function loadJson(path: string) {
+    return JSON.parse(await readFile(path, 'utf8'));
+};
+
+export async function getPositionsBatch(addresses: string[]) {
+    const result: { [address: string]: number } = {};
+    const chunks = chunkArray(addresses, 5)
+    for (const chunk of chunks) {
+        const pos = await Promise.all(chunk.map(address => searchPositions(address)))
+        pos.forEach(p => {
+            p.forEach(item => {
+                let old = result[item.proxyWallet] ?? 0
+                result[item.proxyWallet] = old + item.size * item.curPrice
+            })
+        })
+    }
+    return result;
+}
+
+export async function searchPositions(proxyWallet: string, proxy: string | undefined = process.env.SOCKS_PROXY) {
+    if (ethers.utils.isAddress(proxyWallet)) {
+        try {
+            const params = new URLSearchParams({
+                redeemable: 'false',
+                sizeThreshold: '0',
+                limit: '100',
+                sortBy: 'TOKENS',
+                sortDirection: 'DESC',
+                user: proxyWallet
+            })
+            const url = `https://data-api.polymarket.com/positions?${params.toString()}`
+            // console.debug(`searchPositions url: ${url}`)
+            const response = await fetchWithProxy(url, {}, proxy);
+            if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
+            const data = await response.json() as any[];
+            return data
+        } catch (e) {
+            console.error("searchPositions error:", e)
+        }
+    }
+    return []
 }

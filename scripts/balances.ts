@@ -1,8 +1,8 @@
 import { ethers } from 'ethers';
 import Table from 'cli-table3';
-import addresses from '../all_address.json'
-import { BalanceInfo, getBalancesBatch } from './balance-helper';
-
+import { BalanceInfo, getBalancesBatch, getPositionsBatch, loadJson } from './balance-helper';
+import dotenv from "dotenv"
+dotenv.config()
 
 interface AddressSummary {
     address: string;
@@ -24,14 +24,22 @@ class ERC20BalanceChecker {
     }
 
     // 批量获取多个地址的余额
-    async getBatchBalances(addresses: string[]): Promise<AddressSummary[]> {
+    async getBatchBalances(addresses: string[], isPosition: boolean): Promise<AddressSummary[]> {
         const summaries: AddressSummary[] = [];
 
         console.log(`正在查询 ${addresses.length} 个地址...`);
         const balances = await getBalancesBatch(this.provider, this.tokens, addresses)
+        let positions: { [address: string]: number } = {}
+        if (isPosition) {
+            positions = await getPositionsBatch(addresses)
+            // console.log("positions:", positions)
+        }
 
         for (const address of addresses) {
             const userBalances = balances.filter(b => b.address === address)
+            userBalances.forEach(bInfo => {
+                bInfo.balanceFormatted = (parseFloat(bInfo.balanceFormatted) + (positions[address.toLowerCase()] ?? 0)).toFixed(4)
+            })
             const totalUSD = userBalances.reduce((total, balance) => total + parseFloat(balance.balanceFormatted), 0);
             summaries.push({
                 address,
@@ -103,6 +111,18 @@ class ERC20BalanceChecker {
 
 // 主函数
 async function main() {
+    const args = process.argv.slice(2);
+    let addresFile = "all_address.json"
+    let isPosition = false
+    if (args.length > 0) {
+        addresFile = args[0]
+    }
+    if (args.length > 1 && args[1] === "P") {
+        isPosition = true
+    }
+    let addresses: string[] = []
+    try { addresses = await loadJson(addresFile) } catch { }
+
     // 从环境变量获取RPC URL，如果没有则使用默认值
     const RPC_URL = process.env.RPC_URL || 'https://polygon-rpc.com';
 
@@ -113,6 +133,7 @@ async function main() {
         console.log('请设置CHECK_BALANCE_ADDRESS环境变量')
         return
     }
+    envAddresses = [...new Set(envAddresses)]
 
     // 可以添加自定义代币
     const customTokens: string[] = [];
@@ -125,7 +146,7 @@ async function main() {
     console.log(`查询地址数量: ${envAddresses.length}`);
     console.log(`监控代币数量: ${allTokens.length}`);
 
-    const summaries = await checker.getBatchBalances(envAddresses);
+    const summaries = await checker.getBatchBalances(envAddresses, isPosition);
 
     // 显示每个地址的详细余额
     summaries.forEach((summary, index) => {

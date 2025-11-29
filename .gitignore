@@ -17,4 +17,5 @@ node_modules
 data
 logs
 dist
-all_address.json
+*_address.json
+envs
