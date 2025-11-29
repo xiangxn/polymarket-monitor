@@ -5,7 +5,7 @@ dotenvConfig({ path: resolve(__dirname, `../${process.env.ENV_FILE || ''}.env`) 
 
 import { ethers } from 'ethers';
 import { initTelegramBot, sendAlert } from '../src/notifiers/telegram-notifier';
-import { BalanceInfo, getBalancesBatch } from "./balance-helper";
+import { BalanceInfo, getBalancesBatch, getPositionsBatch } from "./balance-helper";
 
 // 配置项
 interface Config {
@@ -29,6 +29,10 @@ class BalanceMonitor {
     // 批量获取余额（使用multicall3方式）
     async getBalancesBatch() {
         const results: BalanceInfo[] = await getBalancesBatch(this.provider, this.config.tokenContracts, this.config.addresses)
+        const positions = await getPositionsBatch(this.config.addresses)
+        results.forEach(bInfo => {
+            bInfo.balanceFormatted = (parseFloat(bInfo.balanceFormatted) + (positions[bInfo.address.toLowerCase()] ?? 0)).toFixed(4)
+        })
         return results;
     }
 
