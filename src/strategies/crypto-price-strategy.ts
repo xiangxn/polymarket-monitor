@@ -212,7 +212,7 @@ export class CryptoPriceStrategy {
                 }
             }
         } else {
-            await this.checkEnter(market, timeLeft)
+            await this.checkEnter(market, token, timeLeft)
         }
     }
 
@@ -221,16 +221,21 @@ export class CryptoPriceStrategy {
      * @param market Polymarket市场对象
      * @returns 
      */
-    protected async checkEnter(market: PolymarketMarket, timeLeft: number) {
-        // console.log('timeLeft:', timeLeft)
+    protected async checkEnter(market: PolymarketMarket, token: Token, timeLeft: number) {
         // 时间窗口内入场
         if (timeLeft > this.config.ENTRY_WINDOW_HIGH || timeLeft < this.config.ENTRY_WINDOW_LOW) return
 
+        // 持有仓位
+        if (hasPosition(token.tokenId)) return
+
         // compute PM YES/NO[UP/DOWN] price diff using bestSell/bestBuy as approximations
-        const bestYesBid = market.tokens[0].bid.price
-        const bestYesAsk = market.tokens[0].ask.price
-        const bestNoBid = market.tokens[1].bid.price
-        const bestNoAsk = market.tokens[1].ask.price
+        const yesIndex = market.clobTokenIds.findIndex(t => t === token.tokenId)
+        if (yesIndex === -1) return
+        const isUP = yesIndex === 0 ? true : false
+        const noIndex = yesIndex === 0 ? 1 : 0
+
+        const bestBid = token.bid.price
+        const bestAsk = token.ask.price
 
         const symbol = this.symbolMap.get(market.conditionId)
         if (!symbol) return
@@ -264,74 +269,53 @@ export class CryptoPriceStrategy {
 
         if (volatility_10s <= this.config.VOLATILITY_MARGIN * volatility_30s) return
 
-
-        console.debug(`symbol: ${symbol}, openPrice: ${openPrice}, nowPrice: ${nowPrice}, bestYesAsk: ${bestYesAsk}, bestNoAsk: ${bestNoAsk}
+        console.debug(`symbol: ${symbol}, openPrice: ${openPrice}, nowPrice: ${nowPrice}, bestAsk: ${bestAsk}, bestAsk: ${bestAsk}
             avg10: ${avg10}, avg30: ${avg30}, volatility_10s: ${volatility_10s}, volatility_30s: ${volatility_30s}
-            trendScore: ${trendScore}, vol: ${vol}, bookDiff: ${bestYesBid - bestNoAsk}, ${bestNoBid - bestYesAsk}
+            trendScore: ${trendScore}, vol: ${vol}, bookDiff: ${bestBid - bestAsk}
             trendScore >= TREND_THRESHOLD[${this.config.TREND_THRESHOLD}]: ${trendScore >= this.config.TREND_THRESHOLD},${trendScore <= -this.config.TREND_THRESHOLD}
             (vol >= MIN_PRICE_DELTA_THRESHOLD[${this.config.MIN_PRICE_DELTA_THRESHOLD}] && vol <= MAX_PRICE_DELTA_THRESHOLD[${this.config.MAX_PRICE_DELTA_THRESHOLD}]): ${(vol >= this.config.MIN_PRICE_DELTA_THRESHOLD && vol <= this.config.MAX_PRICE_DELTA_THRESHOLD)}
             (nowPrice >= openPrice && nowPrice >= avg10 && avg10 >= avg30): ${(nowPrice >= openPrice && nowPrice >= avg10 && avg10 >= avg30)}, ${(nowPrice < openPrice && nowPrice <= avg10 && avg10 <= avg30)}
             volatility_10s > VOLATILITY_MARGIN[${this.config.VOLATILITY_MARGIN}] * volatility_30s: ${volatility_10s > this.config.VOLATILITY_MARGIN * volatility_30s}`)
 
-        // BUY UP condition
-        if (trendScore >= this.config.TREND_THRESHOLD && (nowPrice >= openPrice && nowPrice >= avg10 && avg10 >= avg30)) {
-            // 持有仓位
-            if (hasPosition(market.tokens[0].tokenId)) return
-            // 入场限价
-            if (!bestYesAsk || bestYesAsk > this.config.MAX_ENTRY_PRICE) return
-            // 盘口差
-            if (bestYesBid - bestNoAsk > this.config.MAX_BOOK_DIFF) return
-            // 订单金额限制
-            let size = Math.min(market.tokens[0].ask.size * market.tokens[0].ask.price, this.config.MAX_ORDER_SIZE)
-            size = Math.max(size, this.config.MIN_ORDER_SIZE)
-            if (size < this.config.MIN_ORDER_SIZE) return    // size太小，不操作
-            // 风控过滤
-            const cash = getCash()
-            if (cash - size < this.config.MIN_BALANCE) return
+        
+        // 入场限价
+        if (!bestAsk || bestAsk > this.config.MAX_ENTRY_PRICE) return
+        // 盘口差
+        if (market.tokens[yesIndex].bid.price - market.tokens[noIndex].ask.price > this.config.MAX_BOOK_DIFF) return
+        // 订单金额限制
+        let size = Math.min(token.ask.size * token.ask.price, this.config.MAX_ORDER_SIZE)
+        size = Math.max(size, this.config.MIN_ORDER_SIZE)
+        if (size < this.config.MIN_ORDER_SIZE) return    // size太小，不操作
+        // 风控过滤
+        const cash = getCash()
+        if (cash - size < this.config.MIN_BALANCE) return
 
-            console.info("=== DECISION: BUY UP", JSON.stringify({ tokenId: market.tokens[0].tokenId, timeLeft, trendScore, nowPrice, openPrice, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
-            // place order via Polymarket CLOB REST / relayer.
-            enqueueOrder({
-                type: 'buy',
-                eventId: getEventByMarket(market)?.id ?? '0',
-                conditionId: market.conditionId,
-                marketId: market.id,
-                tokenId: market.tokens[0].tokenId,
-                amount: +size.toFixed(4),
-                price: market.tokens[0].ask.price,
-                outcome: market.tokens[0].outcome
-            })
+        // 标的价格判断
+        if (isUP) {
+            if (trendScore < this.config.TREND_THRESHOLD || !(nowPrice >= avg10 && avg10 >= avg30)) {
+                return
+            }
+        } else {
+            if (trendScore > -this.config.TREND_THRESHOLD || !(nowPrice <= avg10 && avg10 <= avg30)) {
+                return
+            }
         }
 
-        // BUY DOWN condition
-        if (trendScore <= -this.config.TREND_THRESHOLD && (nowPrice < openPrice && nowPrice <= avg10 && avg10 <= avg30)) {
-            // 持有仓位
-            if (hasPosition(market.tokens[1].tokenId)) return
-            // 入场限价
-            if (!bestNoAsk || bestNoAsk > this.config.MAX_ENTRY_PRICE) return
-            // 盘口差
-            if (bestNoBid - bestYesAsk > this.config.MAX_BOOK_DIFF) return
-            // 订单金额限制
-            let size = Math.min(market.tokens[1].ask.size * market.tokens[1].ask.price, this.config.MAX_ORDER_SIZE)
-            size = Math.max(size, this.config.MIN_ORDER_SIZE)
-            if (size < this.config.MIN_ORDER_SIZE) return
-            // 风控过滤
-            const cash = getCash()
-            if (cash - size < this.config.MIN_BALANCE) return
-
-            console.info("=== DECISION: BUY DOWN", JSON.stringify({ tokenId: market.tokens[1].tokenId, timeLeft, trendScore, nowPrice, openPrice, vol, bestYesAsk, bestNoAsk, avg10, avg30, volatility_10s, volatility_30s }));
-            // place order...
-            enqueueOrder({
-                type: 'buy',
-                eventId: getEventByMarket(market)?.id ?? '0',
-                conditionId: market.conditionId,
-                marketId: market.id,
-                tokenId: market.tokens[1].tokenId,
-                amount: +size.toFixed(4),
-                price: market.tokens[1].ask.price,
-                outcome: market.tokens[1].outcome
-            })
-        }
+        console.info(`=== DECISION: BUY ${token.outcome}`, JSON.stringify({
+            tokenId: token.tokenId, timeLeft, trendScore, nowPrice, openPrice, vol,
+            bestYesAsk: market.tokens[yesIndex].ask.price, bestNoAsk: market.tokens[noIndex].ask.price, avg10, avg30, volatility_10s, volatility_30s
+        }));
+        // place order via Polymarket CLOB REST / relayer.
+        enqueueOrder({
+            type: 'buy',
+            eventId: getEventByMarket(market)?.id ?? '0',
+            conditionId: market.conditionId,
+            marketId: market.id,
+            tokenId: token.tokenId,
+            amount: +size.toFixed(4),
+            price: token.ask.price,
+            outcome: token.outcome
+        })
     }
 
     protected onMarketPriceUpdate({ market, token }: { market: PolymarketMarket, token: Token }) {

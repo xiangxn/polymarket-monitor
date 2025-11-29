@@ -49,7 +49,7 @@ export const getConfig = () => {
         TAKE_PROFIT_PRICE: parseFloat(process.env.TAKE_PROFIT_PRICE || '0.93'),            // 止盈价格
         TAKE_PROFIT_MIN_TIME: parseInt(process.env.TAKE_PROFIT_MIN_TIME || '120'),        // 如果止盈时间离结束时间<=此值, 则不止盈, 单位s
         TAKE_PROFIT_DISTANCE_PCT: parseFloat(process.env.TAKE_PROFIT_DISTANCE_PCT || '0.005'), // 最后TAKE_PROFIT_MIN_TIME时间内如果价格差大于此值时不止盈
-        STOP_LOSS_THRESHOLD: parseFloat(process.env.STOP_LOSS_THRESHOLD || '-0.45'),       // 硬止损比例, 默认值亏损45%
+        STOP_LOSS_THRESHOLD: parseFloat(process.env.STOP_LOSS_THRESHOLD || '-0.35'),       // 硬止损比例, 默认值亏损45%
         STOP_LOSS_LOGIC_TIME_THRESHOLD: parseInt(process.env.STOP_LOSS_LOGIC_TIME_THRESHOLD || '20000'),  // 逻辑止损时间阈值, 默认值20s (价格翻转后20s内不止损), 单位ms
         STOP_LOSS_LOGIC_DISTANCE_PCT: parseFloat(process.env.STOP_LOSS_LOGIC_DISTANCE_PCT || '0.0005'),   // 逻辑止损, 当价格已经翻转, 且价格差大于此值时, 且STOP_LOSS_LOGIC_TIME_THRESHOLD时间已经达到止损, 默认值0.0005%
         STOP_LOSS_TIME_LAST: parseInt(process.env.STOP_LOSS_TIME_LAST || '120000'),  // 时间止损, 最后2分钟时价离开盘价较远, 且亏损时止损, 默认值2m, 单位ms
