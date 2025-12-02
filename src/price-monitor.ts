@@ -5,15 +5,21 @@ import { sleep } from './utils/helper';
 
 const config = getConfig();
 
-const priceMap = new Map<string, number>()
+const binanceMap = new Map<string, number>()
+const chainlinkMap = new Map<string, number>()
 
 /**
  *  根据symbol获取外部价格
  * @param symbol 
  * @returns 
  */
-export const getExternalPrice = (symbol: string) => {
-    return priceMap.get(symbol.toUpperCase()) ?? 0
+export const getExternalPrice = (symbol: string, resolutionSource: string) => {
+    if (resolutionSource.includes('data.chain.link')) {
+        return chainlinkMap.get(symbol.toUpperCase()) ?? 0
+    } else if (resolutionSource.includes('www.binance.com')) {
+        return binanceMap.get(symbol.toUpperCase()) ?? 0
+    }
+    return 0
 }
 
 export class PriceMonitor {
@@ -30,6 +36,11 @@ export class PriceMonitor {
             "topic": "crypto_prices",
             "type": "update",
             "filters": ""   // `[{"symbol":"solusdt"},{"symbol":"btcusdt"},{"symbol":"ethusdt"},{"symbol":"xrpusdt"}]`
+        },
+        {
+            "topic": "crypto_prices_chainlink",
+            "type": "update",
+            "filters": ""
         }
     ]
 
@@ -112,7 +123,10 @@ export class PriceMonitor {
                 const data = JSON.parse(raw.data.toString())
                 if (data.payload && data.topic && data.topic === 'crypto_prices') {
                     const { symbol, price } = data.payload
-                    priceMap.set(symbol.replace('usdt', '').toUpperCase(), price)
+                    binanceMap.set(symbol.replace('usdt', '').toUpperCase(), price)
+                } else if (data.payload && data.topic && data.topic === 'crypto_prices_chainlink') {
+                    const { symbol, value } = data.payload
+                    chainlinkMap.set(symbol.replace('/usd', '').toUpperCase(), value)
                 }
             } catch (err) {
                 console.error('Price WS onmessage parse error', err);

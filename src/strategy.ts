@@ -16,6 +16,24 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
             if (position.entryPrice === 0) {    // 如果还没有收到订单数据，就暂时跳过
                 return
             }
+            // 最高优先级止损
+            const resolutionSource = (data.event as any).resolutionSource || (data.event as any).description
+            const currentPrice = getExternalPrice(data.event.targetSymbol, resolutionSource)
+            const relativePriceChange = Math.abs(currentPrice - data.event.openPrice) / data.event.openPrice
+            if (relativePriceChange < config.STOP_LOSS_RELATIVE_PRICE_CHANGE) {
+                console.info(`[strategy] 止损: ${token.tokenId}, bid价格: ${token.bid.price}, trade价格: ${token.price}, 数量: ${position.size}, relativePriceChange: ${relativePriceChange}`)
+                enqueueOrder({
+                    type: 'sell',
+                    conditionId: market.conditionId,
+                    eventId: data.event.id,
+                    tokenId: token.tokenId,
+                    amount: position.size,
+                    price: token.bid.price,
+                    marketId: data.marketId,
+                    outcome: token.outcome
+                })
+                return
+            }
             if (token.bid.price < position.stopLoss) {  // 判断止损
                 if (token.price >= config.STOP_LOSS_FLIP_LIMIT) return  // 价格未超过止损翻转限制，不止损
 
@@ -116,8 +134,9 @@ async function checkSignal(event: PolymarketEvent) {
 
     // 价格相对变动幅度过滤
     if (event.openPrice > 0) {
-        const currentPrice = getExternalPrice(event.targetSymbol)
-        const relativePriceChange = (currentPrice - event.openPrice) / event.openPrice
+        const resolutionSource = (event as any).resolutionSource || (event as any).description
+        const currentPrice = getExternalPrice(event.targetSymbol, resolutionSource)
+        const relativePriceChange = Math.abs(currentPrice - event.openPrice) / event.openPrice
         if (relativePriceChange < config.RELATIVE_PRICE_CHANGE) {
             console.info(`[strategy] 价格相对变动幅度过小, 不进行扫尾盘检查: ${event.targetSymbol}, 当前价格: ${currentPrice}, 开盘价格: ${event.openPrice}, 相对变动幅度: ${relativePriceChange}`)
             return
