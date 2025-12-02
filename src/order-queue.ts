@@ -99,7 +99,7 @@ eventBus.on('order', async (order: OrderMessage) => {
                 realizedPnL: 0,
                 timestamp: Date.now()
             })
-            subCash(amount)
+            // subCash(amount)
         } else if (side === 'SELL') {
             addCash(amount)
             subPosition(order.asset_id, size)
@@ -129,6 +129,8 @@ async function fakeApiPlaceOrder(task: OrderTask) {
             const key = `${task.marketId}:${task.tokenId}:${task.type}`;
             activeKeys.delete(key);
         } else {
+            // 先扣除本地资金
+            subCash(task.amount)
             // 添加空持仓，防止重复下单
             addPosition({
                 eventId: task.eventId,
