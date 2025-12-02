@@ -123,12 +123,6 @@ function checkWindow(price: number): boolean {
 }
 
 async function checkSignal(event: PolymarketEvent) {
-    // 风控过滤
-    const cash = getCash()
-    if (cash <= config.MIN_BALANCE) {
-        // console.info(`[strategy] 到达止损位置, 不进行扫尾盘检查`)
-        return
-    }
     // 时间窗口过滤
     if (new Date(event.endDate).getTime() - Date.now() > config.MIN_END_TIME) return
 
@@ -157,6 +151,12 @@ async function checkSignal(event: PolymarketEvent) {
             size = Math.max(size, config.MIN_ORDER_SIZE)
             if (size < config.MIN_ORDER_SIZE) return    // size太小，不操作
 
+            // 风控过滤
+            const cash = getCash()
+            if (cash - size < config.MIN_BALANCE) {
+                return
+            }
+
             if (checkBuy(token)) {
                 enqueueOrder({
                     type: 'buy',
@@ -182,6 +182,12 @@ async function checkSignal(event: PolymarketEvent) {
                     let size = Math.min(token.ask.size * token.ask.price, config.MAX_ORDER_SIZE)
                     size = Math.max(size, config.MIN_ORDER_SIZE)
                     if (size < config.MIN_ORDER_SIZE) return    // size太小不操作
+
+                    // 风控过滤
+                    const cash = getCash()
+                    if (cash - size < config.MIN_BALANCE) {
+                        return
+                    }
 
                     if (checkBuy(token)) {
                         enqueueOrder({
