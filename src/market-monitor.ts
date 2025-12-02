@@ -591,7 +591,7 @@ export class MarketMonitor extends EventEmitter {
             if (markets) {
                 markets.forEach(m => {
                     if (this.marketMap.has(m.conditionId)) return
-                    
+
                     if (m.closed === false && new Date(m.eventStartTime).getTime() <= Date.now() && new Date(m.endDate).getTime() > Date.now()) {
                         TAG_SLUGS.forEach(slug => {
                             const tag = m.tags?.find(t => t.slug === slug)
@@ -620,6 +620,7 @@ export class MarketMonitor extends EventEmitter {
                 if (!mk.events[0].volume) {
                     mk.events[0].volume = mk.volume ?? 0
                 }
+                mk.events[0].upProb = mk.upProb ?? 0
                 events.push(mk.events[0])
             }
         })

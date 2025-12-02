@@ -21,6 +21,8 @@ export interface PolymarketEvent {
     openPrice: number;
     // 预测标的symbol
     targetSymbol: CryptoPriceSymbol;
+    // 预测的UP概率
+    upProb?: number;
 }
 
 export interface PolymarketMarket {
@@ -39,6 +41,8 @@ export interface PolymarketMarket {
     // index=0 为Yes[UP], index=1 为No[DOWN]
     tokens: Token[];
     liquidityNum: number;
+    // 预测的UP概率
+    upProb?: number;
 }
 
 export interface Token {

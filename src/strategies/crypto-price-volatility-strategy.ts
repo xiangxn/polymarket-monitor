@@ -2,10 +2,12 @@ import { ConfigType, getConfig } from "../config"
 import { EVENT_KEY_MARKET_RESOLVED, EVENT_KEY_MARKET_START, EVENT_KEY_UPDATE_PRICE, eventBus } from "../event-bus"
 import { MarketMonitor } from "../market-monitor"
 import { getMarketStartTime, getSearchTimeUnit, getSymbol, getTimeUnit } from "../polymarket"
+import { addPosition, getCash, hasPosition, onPriceUpdate, subPosition } from "../position"
 import { CryptoPriceSymbol, PolymarketMarket } from "../types"
 import { computeVolatilityEWMA, probEndAboveOpen } from "../utils/math"
 
 type PricePoint = { ts: number /* seconds */, price: number }
+type CalcResult = { probUp: number; sigma: number }
 
 export class CryptoPriceVolatilityStrategy {
     private readonly eventType = 'crypto-prices'
@@ -32,6 +34,11 @@ export class CryptoPriceVolatilityStrategy {
      * 市场对应的加密货币symbol
      */
     private symbolMap: Map<string, CryptoPriceSymbol> = new Map()
+    /**
+     * 进入时概率
+     * tokenId -> prob
+     */
+    private entryProbMap: Map<string, number> = new Map();
 
     private config: ConfigType;
     private priceInterval: NodeJS.Timeout | null = null;
@@ -114,6 +121,10 @@ export class CryptoPriceVolatilityStrategy {
             if (markets) {
                 const index = markets.findIndex(m => m.conditionId === market.conditionId)
                 if (index !== -1) {
+                    // 删除对应的tokenId的entryProbMap
+                    markets[index].tokens.forEach(token => {
+                        this.entryProbMap.delete(token.tokenId)
+                    })
                     markets.splice(index, 1)
                 }
             }
@@ -148,7 +159,7 @@ export class CryptoPriceVolatilityStrategy {
         if (!prices) return
 
         if (prices.length === 0 || now - prices[0].ts < this.windowSeconds) {
-            console.info(`${symbol} Price data is being prepared... [${prices.length}]`)
+            // console.info(`${symbol} Price data is being prepared... [${prices.length}]`)
             return
         }
 
@@ -163,16 +174,9 @@ export class CryptoPriceVolatilityStrategy {
 
                 const currentPrice = prices[prices.length - 1].price
                 const result = this.checkSweepEWMA(openPrice, currentPrice, prices.map(p => p.price), secondsLeft)
-                console.debug(`
-                    time (UTC secs)   : ${now}
-                    openPrice         : ${openPrice}
-                    currentPrice      : ${currentPrice}
-                    secondsLeft       : ${secondsLeft}
-                    sigma1m (1m std)  : ${result.sigma}
-                    Probability       : ${(result.probUp * 100).toFixed(3)} %
-                    signal            : ${result.shouldSweep} ${result.tokenIndex ? market.tokens[result.tokenIndex].outcome : 'NULL'}
-                    `)
-                // TODO: 检查下单或者止盈/损
+                market.upProb = result.probUp
+                // 检查下单或者止盈/损
+                this.checkSignal(market, result, secondsLeft)
             })
         }
 
@@ -183,23 +187,100 @@ export class CryptoPriceVolatilityStrategy {
         P_now: number,
         prices: number[],
         remainingT: number,
-        p_limit: number = 0.03,
         lambda: number = 0.98
-    ): { shouldSweep: boolean; tokenIndex: number | null; probUp: number; sigma: number } {
+    ): CalcResult {
         const sigma = computeVolatilityEWMA(prices, lambda)
         const probUp = probEndAboveOpen(P_start, P_now, sigma, remainingT)
+        return { probUp, sigma }
+    }
 
-        let shouldSweep = false
-        let tokenIndex: number | null = null
+    protected async checkSignal(market: PolymarketMarket, calcResult: CalcResult, secondsLeft: number) {
+        // 更新Position, 检查止盈止损
+        market.tokens.forEach((token, index) => {
+            const position = onPriceUpdate(token.tokenId, token.bid.price)
+            if (position) {
+                if (position.entryPrice === 0) {    // 如果还没有收到订单数据，就暂时跳过
+                    return
+                }
 
-        if (probUp > 1 - p_limit) {
-            shouldSweep = true
-            tokenIndex = 0
-        } else if (probUp < p_limit) {
-            shouldSweep = true
-            tokenIndex = 1
+                const prob = index === 0 ? calcResult.probUp : 1 - calcResult.probUp
+                const price = token.bid.price
+                const spread = token.ask.price - token.bid.price
+
+                /********************止损********************/
+                const entryProb = this.entryProbMap.get(token.tokenId) ?? 0
+                // 买入理由消失
+                if (prob < entryProb - 0.05) {
+                    console.warn(`=== DECISION: STOP LOSS [Prob < entryProb] ==== ${token.outcome} ${token.tokenId} ${position.entryPrice} -> ${token.price}, ${token.bid.price}, prob:${entryProb}->${prob}`)
+                    subPosition(token.tokenId, position.size)
+                    return
+                }
+                // 剩余时间非常短
+                if (secondsLeft < 20 && prob < 0.5) {
+                    console.warn(`=== DECISION: STOP LOSS [Prob < 0.5 && secondsLeft < 20] ==== ${token.outcome} ${token.tokenId} ${position.entryPrice} -> ${token.price}, ${token.bid.price}, prob:${entryProb}->${prob}`)
+                    subPosition(token.tokenId, position.size)
+                    return
+                }
+                // 订单簿瞬间断层
+                if (spread > 0.06 && price < position.entryPrice - 0.03) {
+                    console.warn(`=== DECISION: STOP LOSS [spread < 0.06] ==== ${token.outcome} ${token.tokenId} ${position.entryPrice} -> ${token.price}, ${token.bid.price}, prob:${entryProb}->${prob}`)
+                    subPosition(token.tokenId, position.size)
+                    return
+                }
+
+                /********************止盈*******************/
+                // 用概率止盈
+                if (prob > 0.85) {
+                    console.warn(`=== DECISION: TAKE PROFIT [Prob > 0.85] ==== ${token.outcome} ${token.tokenId} ${position.entryPrice} -> ${token.price}, ${token.bid.price}, prob:${entryProb}->${prob}`)
+                    subPosition(token.tokenId, position.size)
+                    return
+                }
+                // 用价格止盈
+                if (token.bid.price > position.entryPrice * (1 + this.config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= this.config.TAKE_PROFIT_PRICE) {
+                    console.warn(`=== DECISION: TAKE PROFIT [Price > entryPrice] ==== ${token.outcome} ${token.tokenId} ${position.entryPrice} -> ${token.price}, ${token.bid.price}, prob:${entryProb}->${prob}`)
+                    subPosition(token.tokenId, position.size)
+                    return
+                }
+            }
+        })
+        // 检查是否可以下单
+        if (calcResult.probUp >= 0.9 || calcResult.probUp <= 0.1) {
+            const tokenIndex = calcResult.probUp >= 0.9 ? 0 : 1
+            const prob = tokenIndex === 0 ? calcResult.probUp : 1 - calcResult.probUp
+            if (prob <= 0 || prob >= 1) return
+
+            // 时间窗口内入场
+            if (secondsLeft > this.config.ENTRY_WINDOW_HIGH || secondsLeft < this.config.ENTRY_WINDOW_LOW) return
+
+            const token = market.tokens[tokenIndex]
+            if (hasPosition(token.tokenId)) return
+
+            // 订单金额限制
+            let size = Math.min(token.ask.size * token.ask.price, this.config.MAX_ORDER_SIZE)
+            size = Math.max(size, this.config.MIN_ORDER_SIZE)
+            if (size < this.config.MIN_ORDER_SIZE) return    // size太小，不操作
+            // 风控过滤
+            const cash = getCash()
+            if (cash - size < this.config.MIN_BALANCE) return
+
+            if (token.ask.price < prob - 0.04) {
+                this.entryProbMap.set(token.tokenId, prob)
+                console.warn(`=== DECISION: BUY ==== ${token.outcome} ${token.tokenId} size: ${size} askPrice: ${token.ask.price}, Price: ${token.price}, Prob:${(prob * 100).toFixed(3)}%`)
+                addPosition({
+                    eventId: "0",
+                    conditionId: market.conditionId,
+                    marketId: market.id,
+                    tokenId: token.tokenId,
+                    outcome: token.outcome,
+                    entryPrice: token.ask.price,
+                    currentPrice: token.ask.price,
+                    stopLoss: 0,
+                    size: +(size / token.ask.price).toFixed(2),
+                    realizedPnL: 0,
+                    timestamp: Date.now()
+                })
+                return
+            }
         }
-
-        return { shouldSweep, tokenIndex, probUp, sigma }
     }
 }
