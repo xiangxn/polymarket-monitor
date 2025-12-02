@@ -244,8 +244,8 @@ export class CryptoPriceVolatilityStrategy {
             }
         })
         // 检查是否可以下单
-        if (calcResult.probUp >= 0.9 || calcResult.probUp <= 0.1) {
-            const tokenIndex = calcResult.probUp >= 0.9 ? 0 : 1
+        if (calcResult.probUp >= 0.8 || calcResult.probUp <= 0.2) {
+            const tokenIndex = calcResult.probUp >= 0.8 ? 0 : 1
             const prob = tokenIndex === 0 ? calcResult.probUp : 1 - calcResult.probUp
             if (prob <= 0 || prob >= 1) return
 
