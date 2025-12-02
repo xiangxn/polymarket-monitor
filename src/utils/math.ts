@@ -87,3 +87,18 @@ export function erf(x: number): number {
 export function normalCDF(x: number): number {
     return 0.5 * (1 + erf(x / Math.sqrt(2)))
 }
+
+/**
+ * 剩余时间结束价格大于开盘价概率
+ */
+export function probEndAboveOpen(
+    P_start: number,
+    P_now: number,
+    sigma: number,
+    remainingT: number
+): number {
+    const sigma_T = sigma * Math.sqrt(remainingT)
+    const delta = P_start - P_now
+    const prob = 1 - normalCDF(delta / sigma_T)
+    return prob
+}

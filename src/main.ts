@@ -18,6 +18,7 @@ import { initOrderQueue } from './order-queue';
 
 import { MarketMonitor } from './market-monitor';
 import { CryptoPriceStrategy } from "./strategies/crypto-price-strategy";
+import { CryptoPriceVolatilityStrategy } from './strategies/crypto-price-volatility-strategy';
 
 
 
@@ -27,7 +28,7 @@ async function main() {
 
     const marketMonitor = new MarketMonitor();
     const userMonitor = new UserMonitor();
-    const fifteenStrategy = new CryptoPriceStrategy();
+    const fifteenStrategy = new CryptoPriceVolatilityStrategy();
     let running = true
 
     process.on('SIGINT', async () => {

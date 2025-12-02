@@ -451,6 +451,11 @@ export async function redeemNegRisk(client: RelayClient, conditionId: string, am
     return metadata
 }
 
+export function getMarketStartTime(market: PolymarketMarket) {
+    if (!market.eventStartTime) return null;
+    return new Date(market.eventStartTime)
+}
+
 export function getStartTime(unit: string, endDate: string) {
     let startDate = new Date(endDate)
     const units = Object.values(TIME_UNIT_MAP)
