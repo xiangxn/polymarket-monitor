@@ -56,7 +56,7 @@ export const getConfig = () => {
         STOP_LOSS_DELAY: parseInt(process.env.STOP_LOSS_DELAY || '5000'),               // 止损延迟时间, 单位ms, 比如5秒内有成交价低于止损价
         STOP_LOSS_VOLUME_AVG_RATE: parseFloat(process.env.STOP_LOSS_VOLUME_AVG_RATE || '0.3'),    // STOP_LOSS_DELAY的交易量大于平均交易量的百分比，则触发止损
         STOP_LOSS_TRADE_COUNT: parseInt(process.env.STOP_LOSS_TRADE_COUNT || '3'),                // STOP_LOSS_DELAY的卖单数量>=STOP_LOSS_TRADE_COUNT，则触发止损
-        STOP_LOSS_RELATIVE_PRICE_CHANGE: parseFloat(process.env.stop_loss_RELATIVE_PRICE_CHANGE || '0.0001'),  // 当前价格与开盘价格之差太小, 止损
+        STOP_LOSS_RELATIVE_PRICE_CHANGE: parseFloat(process.env.STOP_LOSS_RELATIVE_PRICE_CHANGE || '0.00005'),  // 当前价格与开盘价格之差太小, 止损
         TAKE_PROFIT_PERCENTAGE: parseFloat(process.env.TAKE_PROFIT_PERCENTAGE || '0.3'),   // 止盈百分比
         TAKE_PROFIT_PRICE: parseFloat(process.env.TAKE_PROFIT_PRICE || '0.99'),             // 止盈价格
         TAKE_PROFIT_MIN_TIME: parseInt(process.env.TAKE_PROFIT_MIN_TIME || '1') * 60 * 1000,        // 如果止盈时间离结束时间<=此值，则不止盈
