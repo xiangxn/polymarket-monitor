@@ -22,6 +22,7 @@ export const getConfig = () => {
         SEARCH_START_TIME: parseFloat(process.env.SEARCH_START_TIME ?? "0"),  // 过滤事件结束时间end_date_min,单位m
         SEARCH_END_TIME: parseFloat(process.env.SEARCH_END_TIME ?? "5"),     // 过滤事件结束时间end_date_max,单位m
         MIN_CYCLE_DELAY_MS: parseFloat(process.env.MIN_CYCLE_DELAY_MS ?? "2"),  // 每轮最小间隔,单位s
+        DATA_JITTER_DELAY: parseInt(process.env.DATA_JITTER_DELAY ?? "30"),  // 数据防抖延迟,单位ms
 
         // 监控
         LISTEN_TAKE_PROFIT: parseFloat(process.env.LISTEN_TAKE_PROFIT ?? "0.4"),

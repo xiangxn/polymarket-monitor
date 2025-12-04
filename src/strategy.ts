@@ -7,45 +7,76 @@ import { getExternalPrice } from './price-monitor';
 
 const config = getConfig()
 
+/**
+ * market.conditionId -> scheduled
+ */
+const calcState = new Map<string, { scheduled: boolean }>();
+
 // 监听价格更新主要用于止盈止损
 eventBus.on('price_update', async (data: { marketId: string, tokenId: string, event: PolymarketEvent, }) => {
     const market = data.event.markets.find(m => m.id === data.marketId)!
-    await Promise.all(market.tokens.map(async (token) => {
-        const position = onPriceUpdate(token.tokenId, token.bid.price)
-        if (position) { // 检查是否有持仓
-            if (position.entryPrice === 0) {    // 如果还没有收到订单数据，就暂时跳过
-                return
-            }
-            // 最高优先级止损
-            const resolutionSource = (data.event as any).resolutionSource || (data.event as any).description
-            const currentPrice = getExternalPrice(data.event.targetSymbol, resolutionSource)
-            const relativePriceChange = Math.abs(currentPrice - data.event.openPrice) / data.event.openPrice
-            if (relativePriceChange < config.STOP_LOSS_RELATIVE_PRICE_CHANGE) {
-                console.info(`[strategy] 止损: ${token.tokenId}, bid价格: ${token.bid.price}, trade价格: ${token.price}, 数量: ${position.size}, relativePriceChange: ${relativePriceChange}`)
-                enqueueOrder({
-                    type: 'sell',
-                    conditionId: market.conditionId,
-                    eventId: data.event.id,
-                    tokenId: token.tokenId,
-                    amount: position.size,
-                    price: token.bid.price,
-                    marketId: data.marketId,
-                    outcome: token.outcome
-                })
-                return
-            }
-            if (token.bid.price < position.stopLoss) {  // 判断止损
-                if (token.price >= config.STOP_LOSS_FLIP_LIMIT) return  // 价格未超过止损翻转限制，不止损
+    // 防抖处理
+    let item = calcState.get(market.conditionId);
+    if (!item) {
+        item = { scheduled: false };
+        calcState.set(market.conditionId, item);
+    }
+    if (item.scheduled) return;
 
-                const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
-                if (vols.length === 0) return
+    item.scheduled = true;
+    setTimeout(async () => {
+        await Promise.all(market.tokens.map(async (token) => {
+            const position = onPriceUpdate(token.tokenId, token.bid.price)
+            if (position) { // 检查是否有持仓
+                if (position.entryPrice === 0) {    // 如果还没有收到订单数据，就暂时跳过
+                    return
+                }
+                // 最高优先级止损
+                const resolutionSource = (data.event as any).resolutionSource || (data.event as any).description
+                const currentPrice = getExternalPrice(data.event.targetSymbol, resolutionSource)
+                const relativePriceChange = Math.abs(currentPrice - data.event.openPrice) / data.event.openPrice
+                if (relativePriceChange < config.STOP_LOSS_RELATIVE_PRICE_CHANGE) {
+                    console.info(`[strategy] 止损: ${token.tokenId}, bid价格: ${token.bid.price}, trade价格: ${token.price}, 数量: ${position.size}, relativePriceChange: ${relativePriceChange}`)
+                    enqueueOrder({
+                        type: 'sell',
+                        conditionId: market.conditionId,
+                        eventId: data.event.id,
+                        tokenId: token.tokenId,
+                        amount: position.size,
+                        price: token.bid.price,
+                        marketId: data.marketId,
+                        outcome: token.outcome
+                    })
+                    return
+                }
+                if (token.bid.price < position.stopLoss) {  // 判断止损
+                    if (token.price >= config.STOP_LOSS_FLIP_LIMIT) return  // 价格未超过止损翻转限制，不止损
 
-                const now = Date.now()
-                const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
-                const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
-                const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前STOP_LOSS_DELAY秒卖单的总量
-                if (lastSells.length >= config.STOP_LOSS_TRADE_COUNT && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE && position.size >= 1) {
-                    console.info(`[strategy] 止损: ${token.tokenId}, bid价格: ${token.bid.price}, trade价格: ${token.price}, 数量: ${position.size}`)
+                    const vols = [...token.lastBuy.map(b => b.size), ...token.lastSell.map(s => s.size)]
+                    if (vols.length === 0) return
+
+                    const now = Date.now()
+                    const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length    // 有效数据的平均成交量
+                    const lastSells = token.lastSell.filter(s => s.price < position.stopLoss && now - s.time <= config.STOP_LOSS_DELAY) // STOP_LOSS_DELAY 秒内成交价低于止损价的卖单
+                    const totalSellVol = lastSells.reduce((a, b) => a + b.size, 0)  // 止损前STOP_LOSS_DELAY秒卖单的总量
+                    if (lastSells.length >= config.STOP_LOSS_TRADE_COUNT && totalSellVol > avgVol * config.STOP_LOSS_VOLUME_AVG_RATE && position.size >= 1) {
+                        console.info(`[strategy] 止损: ${token.tokenId}, bid价格: ${token.bid.price}, trade价格: ${token.price}, 数量: ${position.size}`)
+                        enqueueOrder({
+                            type: 'sell',
+                            conditionId: market.conditionId,
+                            eventId: data.event.id,
+                            tokenId: token.tokenId,
+                            amount: position.size,
+                            price: token.bid.price,
+                            marketId: data.marketId,
+                            outcome: token.outcome
+                        })
+                    }
+                } else if (token.bid.price > position.entryPrice * (1 + config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= config.TAKE_PROFIT_PRICE) {  // 判断止盈
+                    // 如果即将结束，则不止盈，减少滑点损失
+                    if (new Date(market.endDate).getTime() - Date.now() <= config.TAKE_PROFIT_MIN_TIME) return
+
+                    console.info(`[strategy] 止盈: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
                     enqueueOrder({
                         type: 'sell',
                         conditionId: market.conditionId,
@@ -57,26 +88,13 @@ eventBus.on('price_update', async (data: { marketId: string, tokenId: string, ev
                         outcome: token.outcome
                     })
                 }
-            } else if (token.bid.price > position.entryPrice * (1 + config.TAKE_PROFIT_PERCENTAGE) || token.bid.price >= config.TAKE_PROFIT_PRICE) {  // 判断止盈
-                // 如果即将结束，则不止盈，减少滑点损失
-                if (new Date(market.endDate).getTime() - Date.now() <= config.TAKE_PROFIT_MIN_TIME) return
-
-                console.info(`[strategy] 止盈: ${token.tokenId}, 价格: ${token.bid.price}, 数量: ${position.size}`)
-                enqueueOrder({
-                    type: 'sell',
-                    conditionId: market.conditionId,
-                    eventId: data.event.id,
-                    tokenId: token.tokenId,
-                    amount: position.size,
-                    price: token.bid.price,
-                    marketId: data.marketId,
-                    outcome: token.outcome
-                })
+            } else {    // 检查是否有扫尾盘机会
+                await checkSignal(data.event);
             }
-        } else {    // 检查是否有扫尾盘机会
-            await checkSignal(data.event);
-        }
-    }))
+        }))
+        item.scheduled = false;
+        calcState.delete(market.conditionId)
+    }, config.DATA_JITTER_DELAY);
 });
 
 // 一轮完成，清仓
