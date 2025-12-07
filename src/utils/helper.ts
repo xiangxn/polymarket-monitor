@@ -56,3 +56,11 @@ export function chunkArray<T>(arr: T[], size: number): T[][] {
         return acc;
     }, []);
 }
+
+export function roundTo15Minutes(date = new Date()) {
+    const d = new Date(date);
+    const minutes = d.getMinutes();
+    const floored = Math.floor(minutes / 15) * 15;
+    d.setMinutes(floored, 0, 0);
+    return d.getTime() / 1000;
+}

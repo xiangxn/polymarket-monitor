@@ -65,11 +65,15 @@ export async function fetchTokensBook(tokens: string[]) {
 }
 
 export async function fetchMarketBySlug(slug: string) {
-    const url = `https://gamma-api.polymarket.com/markets/slug/${slug}`
+    const url = `https://gamma-api.polymarket.com/markets/slug/${slug}?include_tag=true`
     try {
         const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);
         if (!response.ok) throw new Error(`Data API failed: ${response.status}`);
         const data = await response.json() as any;
+        if (data) {
+            data.clobTokenIds = (typeof data.clobTokenIds === 'string') ? JSON.parse(data.clobTokenIds) : data.clobTokenIds;
+            data.outcomes = (typeof data.outcomes === 'string') ? JSON.parse(data.outcomes) : data.outcomes;
+        }
         return data
     } catch (e) {
         console.error("fetchMarketBySlug error:", e)
