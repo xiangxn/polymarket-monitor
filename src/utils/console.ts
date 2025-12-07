@@ -52,9 +52,14 @@ function ensureLogDir() {
 }
 ensureLogDir()
 
+
+function convertToString(args: any[]) {
+    return args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(" ");
+}
+
 // 异步写入日志文件
 async function writeToFile(level: string, message: string) {
-    const logMessage = `${new Date().toISOString()} [${level}] ${message}\n`;
+    const logMessage = `${new Date().toISOString()} [${level}] ${(typeof message === 'object') ? JSON.stringify(message, null, 2) : message}\n`;
     const logFile = getLogFilePath(level);
     try {
         await appendFile(logFile, logMessage, { flag: "a" });
@@ -70,7 +75,7 @@ function getCurrentTimestamp(name: string): string {
 
 console.error = (...args) => {
     const callerFile = getCallFile();
-    const message = args.join(" ");
+    const message = convertToString(args);
     if (config.screen)
         realConsole.error(colors.red, callerFile, getCurrentTimestamp("ERROR"), ...args, colors.reset);
     writeToFile("ERROR", message).catch(err => realConsole.error("Failed to write to log file:", err));
@@ -78,7 +83,7 @@ console.error = (...args) => {
 
 console.warn = (...args) => {
     const callerFile = getCallFile();
-    const message = args.join(" ");
+    const message = convertToString(args);
     if (config.screen)
         realConsole.warn(colors.yellow, callerFile, getCurrentTimestamp("WARN"), ...args, colors.reset);
     writeToFile("WARN", message).catch(err => realConsole.error("Failed to write to log file:", err));
@@ -88,7 +93,8 @@ console.info = (...args) => {
     const callerFile = getCallFile();
     if (config.screen)
         realConsole.info(colors.green, callerFile, getCurrentTimestamp("INFO"), ...args, colors.reset);
-    writeToFile("INFO", args.join(" ")).catch(err => realConsole.error("Failed to write to log file:", err));
+    const message = convertToString(args);
+    writeToFile("INFO", message).catch(err => realConsole.error("Failed to write to log file:", err));
 };
 
 console.debug = (...args) => {
@@ -96,7 +102,8 @@ console.debug = (...args) => {
     if (config.debug) {
         if (config.screen)
             realConsole.debug(colors.cyan, callerFile, getCurrentTimestamp("DEBUG"), ...args, colors.reset);
-        writeToFile("DEBUG", args.join(" ")).catch(err => realConsole.error("Failed to write to log file:", err));
+        const message = convertToString(args);
+        writeToFile("DEBUG", message).catch(err => realConsole.error("Failed to write to log file:", err));
     }
 }
 
@@ -105,7 +112,8 @@ console.log = (...args) => {
     if (config.debug) {
         if (config.screen)
             realConsole.log(colors.grey, callerFile, getCurrentTimestamp("LOG"), ...args, colors.reset);
-        writeToFile("LOG", args.join(" ")).catch(err => realConsole.error("Failed to write to log file:", err));
+        const message = convertToString(args);
+        writeToFile("LOG", message).catch(err => realConsole.error("Failed to write to log file:", err));
     }
 }
 
