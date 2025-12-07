@@ -170,7 +170,7 @@ export class UserMonitor {
                     await Promise.all(mds.map(md => this.checkProfitLoss(md)))
                     await sleep(1)
                 }
-                await sleep(20)
+                await sleep(60)
             } catch (err) {
                 console.error(`checkRedeem error: ${JSON.stringify(err)}`)
                 await sleep(5)
