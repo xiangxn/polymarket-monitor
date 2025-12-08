@@ -6,6 +6,7 @@ import { eventBus } from './event-bus';
 import { getCash, setCash } from './position';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { MetadataType } from './types';
+import { enqueueOrder } from './order-queue';
 
 const config = getConfig();
 
@@ -178,13 +179,15 @@ export class UserMonitor {
             const market = await fetchMarketBySlug(pos.slug)
             const cash = getCash()
             if (market && Date.now() - new Date(market.endDate).getTime() > 60 * 1000 && Number(pos.curPrice) >= 0.999 && cash < config.MIN_BALANCE + 30) {
-                await this.checkProfitLoss({
-                    market: pos.conditionId,
-                    token: pos.asset,
-                    outcome: pos.outcome,
-                    price: pos.avgPrice,
-                    curPrice: pos.curPrice,
-                    size: pos.size
+                enqueueOrder({
+                    type: 'sell',
+                    conditionId: pos.conditionId,
+                    eventId: (market.events && market.events.length > 0) ? market.events[0].id : "0",
+                    tokenId: pos.asset,
+                    amount: pos.size,
+                    price: pos.curPrice,
+                    marketId: market.id,
+                    outcome: pos.outcome
                 })
             }
             await sleep(1)
