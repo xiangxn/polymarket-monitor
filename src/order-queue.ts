@@ -74,7 +74,7 @@ const orderTasks: OrderTask[] = []
 
 eventBus.on('order', async (order: OrderMessage) => {
     await saveOrder(order)
-    const task = orderTasks.find(t => t.marketId === order.market && t.tokenId === order.asset_id)
+    const task = orderTasks.find(t => t.conditionId === order.market && t.tokenId === order.asset_id)
     let eventId = '0'
     if (task) {
         eventId = task.eventId
@@ -89,7 +89,7 @@ eventBus.on('order', async (order: OrderMessage) => {
             addPosition({
                 eventId,
                 conditionId: order.market,
-                marketId: "",
+                marketId: task?.marketId ?? "",
                 tokenId: order.asset_id,
                 outcome: order.outcome,
                 entryPrice: price,
