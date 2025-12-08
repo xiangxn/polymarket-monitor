@@ -88,17 +88,19 @@ export async function fetchMarketBySlug(slug: string) {
     return null
 }
 
-export async function searchPositions(proxyWallet: string) {
+export async function searchPositions(proxyWallet: string, redeemable: boolean = true) {
     if (ethers.utils.isAddress(proxyWallet)) {
         try {
             const params = new URLSearchParams({
-                redeemable: 'true',
                 sizeThreshold: '0',
                 limit: '100',
                 sortBy: 'TOKENS',
                 sortDirection: 'DESC',
                 user: proxyWallet
             })
+            if (redeemable) {
+                params.set('redeemable', 'true')
+            }
             const url = `https://data-api.polymarket.com/positions?${params.toString()}`
             console.debug(`searchPositions url: ${url}`)
             const response = await fetchWithProxy(url, {}, config.SOCKS_PROXY);

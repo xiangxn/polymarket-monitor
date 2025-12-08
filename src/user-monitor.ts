@@ -1,9 +1,9 @@
 import WebSocket from 'ws';
-import { PolymarketClient, searchPositions } from './polymarket';
+import { fetchMarketBySlug, PolymarketClient, searchPositions } from './polymarket';
 import { getConfig } from './config';
 import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
-import { setCash } from './position';
+import { getCash, setCash } from './position';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { MetadataType } from './types';
 
@@ -142,39 +142,65 @@ export class UserMonitor {
         }
     }
 
+    private async redeemPositions(redeemPositions: any[]) {
+        const chunks = chunkArray(redeemPositions, 5)
+        for (const chunk of chunks) {
+            const conditionIds = chunk.map(p => p.conditionId as string)
+            const negRisks = chunk.map(p => p.negativeRisk as boolean)
+            const amounts = chunk.map(p => {
+                if (p.negativeRisk) {
+                    const ams = ["0", "0"]
+                    ams[parseInt(p.outcomeIndex)] = p.size
+                    return ams
+                }
+                return []
+            })
+            const metadatas = chunk.map(p => ({
+                market: p.conditionId,
+                token: p.asset,
+                outcome: p.outcome,
+                price: p.avgPrice,
+                curPrice: p.curPrice,
+                size: p.size
+            } as MetadataType))
+
+            const mds = await this.client.redeemBatch(conditionIds, negRisks, amounts, metadatas)
+            if (mds && mds.length > 0) {
+                // 处理mds,获取市场数据判断盈亏,补充order csv
+                await Promise.all(mds.map(md => this.checkProfitLoss(md)))
+            }
+            await sleep(1)
+        }
+    }
+
+    private async sellPositions(sellPositions: any[]) {
+        for (const pos of sellPositions) {
+            const market = await fetchMarketBySlug(pos.slug)
+            const cash = getCash()
+            if (market && Date.now() - new Date(market.endDate).getTime() > 60 * 1000 && Number(pos.curPrice) >= 0.999 && cash < config.MIN_BALANCE + 30) {
+                await this.checkProfitLoss({
+                    market: pos.conditionId,
+                    token: pos.asset,
+                    outcome: pos.outcome,
+                    price: pos.avgPrice,
+                    curPrice: pos.curPrice,
+                    size: pos.size
+                })
+            }
+            await sleep(1)
+        }
+    }
+
     async checkRedeem() {
         while (this.running) {
             try {
-                let positions = await searchPositions(config.FUNDER_ADDRESS)
+                let positions = await searchPositions(config.FUNDER_ADDRESS, false)
                 positions = positions.filter(p => p.size > 0)
-                const chunks = chunkArray(positions, 5)
-                for (const chunk of chunks) {
-                    const conditionIds = chunk.map(p => p.conditionId as string)
-                    const negRisks = chunk.map(p => p.negativeRisk as boolean)
-                    const amounts = chunk.map(p => {
-                        if (p.negativeRisk) {
-                            const ams = ["0", "0"]
-                            ams[parseInt(p.outcomeIndex)] = p.size
-                            return ams
-                        }
-                        return []
-                    })
-                    const metadatas = chunk.map(p => ({
-                        market: p.conditionId,
-                        token: p.asset,
-                        outcome: p.outcome,
-                        price: p.avgPrice,
-                        curPrice: p.curPrice,
-                        size: p.size
-                    } as MetadataType))
+                const redeemPositions = positions.filter(p => p.redeemable)
+                const sellPositions = positions.filter(p => p.redeemable === false)
+                await this.redeemPositions(redeemPositions) // redeem
+                await this.sellPositions(sellPositions);    // sell
 
-                    const mds = await this.client.redeemBatch(conditionIds, negRisks, amounts, metadatas)
-                    if (mds && mds.length > 0) {
-                        // 处理mds,获取市场数据判断盈亏,补充order csv
-                        await Promise.all(mds.map(md => this.checkProfitLoss(md)))
-                    }
-                    await sleep(1)
-                }
                 await sleep(60)
             } catch (err) {
                 console.error(`checkRedeem error: ${JSON.stringify(err)}`)
