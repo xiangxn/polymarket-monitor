@@ -147,27 +147,32 @@ export class UserMonitor {
             try {
                 let positions = await searchPositions(config.FUNDER_ADDRESS)
                 positions = positions.filter(p => p.size > 0)
-                const chunks = chunkArray(positions, 3)
+                const chunks = chunkArray(positions, 5)
                 for (const chunk of chunks) {
-                    const mds = await Promise.all(chunk.map(p => {
-                        const metadata: MetadataType = {
-                            market: p.conditionId,
-                            token: p.asset,
-                            outcome: p.outcome,
-                            price: p.avgPrice,
-                            curPrice: p.curPrice,
-                            size: p.size
+                    const conditionIds = chunk.map(p => p.conditionId as string)
+                    const negRisks = chunk.map(p => p.negativeRisk as boolean)
+                    const amounts = chunk.map(p => {
+                        if (p.negativeRisk) {
+                            const ams = ["0", "0"]
+                            ams[parseInt(p.outcomeIndex)] = p.size
+                            return ams
                         }
-                        if (p.negativeRisk === false) {
-                            return this.client.redeem(p.conditionId, p.negativeRisk, undefined, metadata)
-                        } else {
-                            const amounts = ["0", "0"]
-                            amounts[parseInt(p.outcomeIndex)] = p.size
-                            return this.client.redeem(p.conditionId, p.negativeRisk, amounts, metadata)
-                        }
-                    }))
-                    // 处理mds,获取市场数据判断盈亏,补充order csv
-                    await Promise.all(mds.map(md => this.checkProfitLoss(md)))
+                        return []
+                    })
+                    const metadatas = chunk.map(p => ({
+                        market: p.conditionId,
+                        token: p.asset,
+                        outcome: p.outcome,
+                        price: p.avgPrice,
+                        curPrice: p.curPrice,
+                        size: p.size
+                    } as MetadataType))
+
+                    const mds = await this.client.redeemBatch(conditionIds, negRisks, amounts, metadatas)
+                    if (mds && mds.length > 0) {
+                        // 处理mds,获取市场数据判断盈亏,补充order csv
+                        await Promise.all(mds.map(md => this.checkProfitLoss(md)))
+                    }
                     await sleep(1)
                 }
                 await sleep(20)
