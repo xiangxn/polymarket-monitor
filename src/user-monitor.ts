@@ -176,6 +176,11 @@ export class UserMonitor {
 
     private async sellPositions(sellPositions: any[]) {
         for (const pos of sellPositions) {
+            const cash = getCash()
+            if (cash >= config.MIN_BALANCE + 30) {
+                await sleep(1)
+                continue
+            }
             const market = await fetchMarketBySlug(pos.slug)
             if (!market) {
                 await sleep(1)
@@ -194,19 +199,17 @@ export class UserMonitor {
                     continue
                 }
             }
-            const cash = getCash()
-            if (cash < config.MIN_BALANCE + 30) {
-                enqueueOrder({
-                    type: 'sell',
-                    conditionId: pos.conditionId,
-                    eventId: (market.events && market.events.length > 0) ? market.events[0].id : "0",
-                    tokenId: pos.asset,
-                    amount: pos.size,
-                    price: pos.curPrice,
-                    marketId: market.id,
-                    outcome: pos.outcome
-                })
-            }
+
+            enqueueOrder({
+                type: 'sell',
+                conditionId: pos.conditionId,
+                eventId: (market.events && market.events.length > 0) ? market.events[0].id : "0",
+                tokenId: pos.asset,
+                amount: pos.size,
+                price: pos.curPrice,
+                marketId: market.id,
+                outcome: pos.outcome
+            })
             await sleep(1)
         }
     }
