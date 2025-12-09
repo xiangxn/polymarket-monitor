@@ -182,7 +182,7 @@ export class UserMonitor {
                 continue
             }
             const market = await fetchMarketBySlug(pos.slug)
-            if (!market) {
+            if (!market || market.orderPriceMinTickSize != 0.001) {
                 await sleep(1)
                 continue
             }
