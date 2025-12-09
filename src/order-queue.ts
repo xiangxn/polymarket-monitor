@@ -123,7 +123,7 @@ async function fakeApiPlaceOrder(task: OrderTask) {
         } else {
             balanceTime = 0
         }
-
+        console.info("执行订单:", task)
         const result = await client?.placeOrder(task.tokenId, task.amount, Side.BUY)
         if (!result) {
             const key = `${task.marketId}:${task.tokenId}:${task.type}`;
