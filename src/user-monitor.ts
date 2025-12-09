@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { fetchMarketBySlug, PolymarketClient, searchPositions } from './polymarket';
+import { fetchMarketBySlug, fetchTokensBook, PolymarketClient, searchPositions } from './polymarket';
 import { getConfig } from './config';
 import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
@@ -177,8 +177,21 @@ export class UserMonitor {
     private async sellPositions(sellPositions: any[]) {
         for (const pos of sellPositions) {
             const market = await fetchMarketBySlug(pos.slug)
+            if (!market) {
+                await sleep(1)
+                continue
+            }
+            const bids = await fetchTokensBook([pos.asset])
+            if (bids && bids.length > 0) {
+                const price = parseFloat(bids[bids.length - 1].price)
+                const size = parseFloat(bids[bids.length - 1].size)
+                if (price < 0.999 || size < pos.size) {
+                    await sleep(1)
+                    continue
+                }
+            }
             const cash = getCash()
-            if (market && Date.now() - new Date(market.endDate).getTime() > 60 * 1000 && Number(pos.curPrice) >= 0.999 && cash < config.MIN_BALANCE + 30) {
+            if (Date.now() - new Date(market.endDate).getTime() > 60 * 1000 && cash < config.MIN_BALANCE + 30) {
                 enqueueOrder({
                     type: 'sell',
                     conditionId: pos.conditionId,
