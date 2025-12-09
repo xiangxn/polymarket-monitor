@@ -181,6 +181,10 @@ export class UserMonitor {
                 await sleep(1)
                 continue
             }
+            if (Date.now() - new Date(market.endDate).getTime() < 60 * 1000) {
+                await sleep(1)
+                continue
+            }
             const bids = await fetchTokensBook([pos.asset])
             if (bids && bids.length > 0) {
                 const price = parseFloat(bids[bids.length - 1].price)
@@ -191,7 +195,7 @@ export class UserMonitor {
                 }
             }
             const cash = getCash()
-            if (Date.now() - new Date(market.endDate).getTime() > 60 * 1000 && cash < config.MIN_BALANCE + 30) {
+            if (cash < config.MIN_BALANCE + 30) {
                 enqueueOrder({
                     type: 'sell',
                     conditionId: pos.conditionId,
