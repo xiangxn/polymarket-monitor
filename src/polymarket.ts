@@ -280,6 +280,8 @@ export class PolymarketClient {
             if (resp.status === 'matched') {
                 return { ...resp, takingAmount: parseFloat(resp.takingAmount || '0'), makingAmount: parseFloat(resp.makingAmount || '0') } as PostOrderResult
             }
+        } else {
+            console.error("placeOrder error:", resp)
         }
         return null
     }
