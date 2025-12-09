@@ -190,6 +190,8 @@ export class UserMonitor {
                 await sleep(1)
                 continue
             }
+
+            let curPrice = pos.curPrice
             const bids = await fetchTokensBook([pos.asset])
             if (bids && bids.length > 0) {
                 const price = parseFloat(bids[bids.length - 1].price)
@@ -198,6 +200,10 @@ export class UserMonitor {
                     await sleep(1)
                     continue
                 }
+                curPrice = Math.max(pos.curPrice, price)
+            } else {
+                await sleep(1)
+                continue
             }
 
             enqueueOrder({
@@ -206,7 +212,7 @@ export class UserMonitor {
                 eventId: (market.events && market.events.length > 0) ? market.events[0].id : "0",
                 tokenId: pos.asset,
                 amount: pos.size,
-                price: pos.curPrice,
+                price: curPrice,
                 marketId: market.id,
                 outcome: pos.outcome
             })
