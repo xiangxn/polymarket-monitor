@@ -186,7 +186,7 @@ export class UserMonitor {
                 await sleep(1)
                 continue
             }
-            if (Date.now() - new Date(market.endDate).getTime() < 60 * 1000) {
+            if (Date.now() - new Date(market.endDate).getTime() < 5 * 60 * 1000) {
                 await sleep(1)
                 continue
             }
