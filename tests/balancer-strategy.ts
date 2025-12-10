@@ -43,6 +43,14 @@ type MarketSnapshot = {
     timestamp: number;
 };
 
+/**
+ * 初始仓位模式
+ * - Average: 使用平均分配资金
+ * - High: 使用最高价格占40%
+ * - Low: 使用最低价格占40%
+ */
+type InitialPositionMode = 'Average' | 'High' | 'Low' | 'Offset'
+
 type Config = {
     marketSlug: string;
     pollingIntervalMs: number;
@@ -76,7 +84,7 @@ type Config = {
     volatilityThreshold: number;    // 波动性阈值
 
     // 初始仓位建立参数
-    initialBalanceRatio: number;     // 初始平衡目标比率 (1.0 = 完全平衡)
+    initialPositionMode: InitialPositionMode;
     maxInitialSpread: number;       // 最大初始价差百分比
 
     // 风险敞口区间: upExp/downExp
@@ -122,7 +130,7 @@ const defaultConfig: Config = {
     priceHistoryWindow: 100,         // 100个价格点用于计算波动性
     volatilityThreshold: 0.02,      // 最小波动性 2%
 
-    initialBalanceRatio: 1.0,         // 完全平衡初始仓位
+    initialPositionMode: 'Average',         // 完全平衡初始仓位
     maxInitialSpread: 0.2,          // 最大初始价差
 
     exposureMin: 0.80,
@@ -470,7 +478,7 @@ function calculateInitialPosition(
     const initialCapital = availableCapital * config.initialCapitalRatio;
 
     // 策略1: 完全平衡初始仓位
-    if (config.initialBalanceRatio === 1.0) {
+    if (config.initialPositionMode === 'Average') {
         // 平均分配资金
         const capitalPerSide = initialCapital / 2;
         const upQty = capitalPerSide / upPrice;
@@ -482,8 +490,41 @@ function calculateInitialPosition(
             totalCost: initialCapital
         };
     }
-
-    // 策略2: 基于当前价格的动态平衡
+    // 策略2: 高价格占40%
+    else if (config.initialPositionMode === 'High') {
+        const max = Math.max(upPrice, downPrice)
+        let upWeight = 0.5, downWeight = 0.5;
+        if (upPrice === max) {
+            upWeight = 0.4
+            downWeight = 0.6
+        } else if (downPrice === max) {
+            upWeight = 0.6
+            downWeight = 0.4
+        }
+        return {
+            upQty: upWeight * initialCapital / upPrice,
+            downQty: downWeight * initialCapital / downPrice,
+            totalCost: initialCapital
+        };
+    }
+    // 策略3: 低价格占40%
+    else if (config.initialPositionMode === 'Low') {
+        const max = Math.max(upPrice, downPrice)
+        let upWeight = 0.5, downWeight = 0.5;
+        if (upPrice === max) {
+            upWeight = 0.6
+            downWeight = 0.4
+        } else if (downPrice === max) {
+            upWeight = 0.4
+            downWeight = 0.6
+        }
+        return {
+            upQty: upWeight * initialCapital / upPrice,
+            downQty: downWeight * initialCapital / downPrice,
+            totalCost: initialCapital
+        };
+    }
+    // 策略4: 根据价格偏离程度调整权重
     else {
         // 根据价格偏离程度调整权重
         const totalImpliedProb = upPrice + downPrice;
