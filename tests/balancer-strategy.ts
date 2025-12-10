@@ -48,6 +48,7 @@ type MarketSnapshot = {
  * - Average: 使用平均分配资金
  * - High: 使用最高价格占40%
  * - Low: 使用最低价格占40%
+ * - Offset: 使用偏移量
  */
 type InitialPositionMode = 'Average' | 'High' | 'Low' | 'Offset'
 
@@ -130,7 +131,7 @@ const defaultConfig: Config = {
     priceHistoryWindow: 100,         // 100个价格点用于计算波动性
     volatilityThreshold: 0.02,      // 最小波动性 2%
 
-    initialPositionMode: 'Average',         // 完全平衡初始仓位
+    initialPositionMode: 'High',
     maxInitialSpread: 0.2,          // 最大初始价差
 
     exposureMin: 0.80,
