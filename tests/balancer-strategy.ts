@@ -1016,12 +1016,13 @@ class Balancer {
                 if (this.market) {
                     const endDate = new Date(this.market.endDate)
                     if (endDate.getTime() < Date.now()) {
+                        const { upPrice, downPrice } = this.currentPriceData
                         this.market = null
                         this.isInitialized = false
                         this.currentPriceData = { upPrice: 0, downPrice: 0 }
                         this.defaultPositions()
                         this.cleanup()
-                        console.warn('🚨 策略已停止，因为市场已结束', "upPnL:", PnL.upPnL, "downPnL:", PnL.downPnL)
+                        console.warn('🚨 策略已停止，因为市场已结束', "upPnL:", PnL.upPnL, "downPnL:", PnL.downPnL, "upPrice:", upPrice, "downPrice:", downPrice)
                     }
                 }
             } catch (err) {
