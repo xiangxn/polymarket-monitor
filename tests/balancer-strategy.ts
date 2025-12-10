@@ -1,7 +1,10 @@
+import { ethers } from "ethers";
+
 import dotenv from "dotenv";
 dotenv.config();
 
-import { ethers } from "ethers";
+import '../src/utils/console'
+
 import { fetchWithProxy, roundTo15Minutes } from "../src/utils/helper";
 import { PriceManager } from "../src/price-manager";
 
@@ -114,7 +117,7 @@ const defaultConfig: Config = {
     verbose: true,
 
     // 初始仓位配置
-    initialCapitalRatio: 0.3,        // 使用50%的初始资金
+    initialCapitalRatio: 0.2,        // 使用50%的初始资金
     minInitialLiquidity: 3000,      // 最小流动性 $10,000
     priceHistoryWindow: 100,         // 100个价格点用于计算波动性
     volatilityThreshold: 0.02,      // 最小波动性 2%
@@ -294,6 +297,14 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     }
 
     const oldAvgSum = up.avgPrice + down.avgPrice;
+
+    // 利润锁定
+    if (upPnL > 0 && downPnL > 0 && oldAvgSum < 0.95) {
+        const ratio = upPnL / downPnL
+        if (ratio > 0.9 && ratio < 1.1) {
+            return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: "Locking in profits" };
+        }
+    }
 
     // ---------- 敞口逻辑 ----------
     const upExp = exposure(up);
@@ -908,7 +919,7 @@ class Balancer {
             }
         } catch (err) {
             console.error('Failed to fetch positions:', err);
-            return;
+            return { upPnL: 0, downPnL: 0 };
         }
 
         // 优先使用 WebSocket 价格数据
@@ -919,15 +930,15 @@ class Balancer {
         down.curPrice = prices.downPrice
         if (this.cfg.verbose) {
             const totalCost = up.size * up.avgPrice + down.size * down.avgPrice
-            console.log(`[${new Date().toISOString()}] snapshot: newPrice=${up.curPrice}/${down.curPrice}, AVG:${up.avgPrice.toFixed(2)}+${down.avgPrice.toFixed(2)}=${(up.avgPrice + down.avgPrice).toFixed(2)}, Size=${up.size.toFixed(2)}/${down.size.toFixed(2)}, Exp=${exposure(up).toFixed(2)}/${exposure(down).toFixed(2)}, Cost=${totalCost.toFixed(2)}, PnL=${(up.size - totalCost).toFixed(2)}/${(down.size - totalCost).toFixed(2)}`);
+            console.info(`snapshot: newPrice=${up.curPrice}/${down.curPrice}, AVG:${up.avgPrice.toFixed(2)}+${down.avgPrice.toFixed(2)}=${(up.avgPrice + down.avgPrice).toFixed(2)}, Size=${up.size.toFixed(2)}/${down.size.toFixed(2)}, Exp=${exposure(up).toFixed(2)}/${exposure(down).toFixed(2)}, Cost=${totalCost.toFixed(2)}, PnL=${(up.size - totalCost).toFixed(2)}/${(down.size - totalCost).toFixed(2)}`);
         }
 
         // 2) 计算修正
-        const { buyUp, buyDown, reason, cost } = computeCorrectionV6(up, down, this.cfg);
+        const { buyUp, buyDown, reason, cost, upPnL, downPnL } = computeCorrectionV6(up, down, this.cfg);
         if (this.cfg.verbose) {
             console.log(`computeCorrection => buyUp=${buyUp.toFixed(4)} buyDown=${buyDown.toFixed(4)} reason=${reason}`);
         }
-        if (buyUp <= 0 && buyDown <= 0) return;
+        if (buyUp <= 0 && buyDown <= 0) return { upPnL, downPnL };
 
         // 这里直接添加position,实盘时才需要真实下单
         if (this.cfg.dryRun) {
@@ -935,7 +946,7 @@ class Balancer {
             this.positions.up.size += buyUp
             this.positions.down.avgPrice = (this.positions.down.avgPrice * this.positions.down.size + buyDown * prices.downPrice) / (this.positions.down.size + buyDown)
             this.positions.down.size += buyDown
-            console.info(`[dryRun] currtne position==== UPSize:${(this.positions.up.size).toFixed(2)}, UPAVG:${(this.positions.up.avgPrice).toFixed(2)} DOWNSize:${this.positions.down.size.toFixed(2)}, DOWNAVG:${this.positions.down.avgPrice.toFixed(2)}, AVG:${(this.positions.down.avgPrice + this.positions.up.avgPrice).toFixed(2)}, COST:${cost.toFixed(2)}`)
+            console.info(`[dryRun] position==== UPSize:${(this.positions.up.size).toFixed(2)}, UPAVG:${(this.positions.up.avgPrice).toFixed(2)} DOWNSize:${this.positions.down.size.toFixed(2)}, DOWNAVG:${this.positions.down.avgPrice.toFixed(2)}, AVG:${(this.positions.down.avgPrice + this.positions.up.avgPrice).toFixed(2)}, COST:${cost.toFixed(2)}`)
         } else {
             // 3) 规划分块
             const chunks = planChunks(buyUp, buyDown, prices.upPrice, prices.downPrice, this.cfg);
@@ -948,7 +959,7 @@ class Balancer {
                 const scale = Math.max(0, (this.cfg.maxCapital - this.usedCapital) / totalUsdcPlanned);
                 if (scale <= 0) {
                     console.warn('No capital left for this market in this run.');
-                    return;
+                    return { upPnL, downPnL };
                 }
                 for (const c of chunks) {
                     c.qty *= scale;
@@ -982,12 +993,13 @@ class Balancer {
                 await new Promise((res) => setTimeout(res, 200 + Math.random() * 200));
             }
         }
+        return { upPnL, downPnL }
     }
 
     async runLoop() {
         // 先初始化
         console.log('🚀 启动策略循环...');
-
+        let PnL: { upPnL: number, downPnL: number } = { upPnL: 0, downPnL: 0 }
         while (true) {
             try {
                 // 如果未初始化，尝试初始化
@@ -998,7 +1010,7 @@ class Balancer {
 
                 // 如果已初始化，执行正常的平衡逻辑
                 if (this.isInitialized) {
-                    await this.stepOnce();
+                    PnL = await this.stepOnce();
                     await new Promise((res) => setTimeout(res, 1_000));
                 }
                 if (this.market) {
@@ -1009,6 +1021,7 @@ class Balancer {
                         this.currentPriceData = { upPrice: 0, downPrice: 0 }
                         this.defaultPositions()
                         this.cleanup()
+                        console.warn('🚨 策略已停止，因为市场已结束', "upPnL:", PnL.upPnL, "downPnL:", PnL.downPnL)
                     }
                 }
             } catch (err) {
