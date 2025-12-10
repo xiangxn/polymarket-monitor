@@ -64,9 +64,7 @@ async function executeOrder(task: OrderTask, key: string) {
     } catch (err) {
         console.error('❌ 下单失败:', err);
     } finally {
-        if (hasPosition(task.tokenId) === false) {
-            activeKeys.delete(key);
-        }
+        activeKeys.delete(key);
     }
 }
 
