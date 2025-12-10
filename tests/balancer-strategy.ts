@@ -114,7 +114,7 @@ const defaultConfig: Config = {
     verbose: true,
 
     // 初始仓位配置
-    initialCapitalRatio: 0.2,        // 使用50%的初始资金
+    initialCapitalRatio: 0.3,        // 使用50%的初始资金
     minInitialLiquidity: 3000,      // 最小流动性 $10,000
     priceHistoryWindow: 100,         // 100个价格点用于计算波动性
     volatilityThreshold: 0.02,      // 最小波动性 2%
@@ -281,15 +281,16 @@ function computeCorrectionV5(up: Position, down: Position, config: Config) {
 function computeCorrectionV6(up: Position, down: Position, config: Config) {
     let buyUp = 0;
     let buyDown = 0;
-    const usedCapital = up.size * up.avgPrice + down.size * down.avgPrice
     const cost = up.size * up.avgPrice + down.size * down.avgPrice
+    const upPnL = up.size - cost
+    const downPnL = down.size - cost
 
     // ---------- 0) 价格合理性检验 ----------
     if (
         up.curPrice <= config.priceLowerBound || up.curPrice >= config.priceUpperBound ||
         down.curPrice <= config.priceLowerBound || down.curPrice >= config.priceUpperBound
     ) {
-        return { buyUp: 0, buyDown: 0, cost, reason: "invalid price (illiquid/no price)" };
+        return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: "invalid price (illiquid/no price)" };
     }
 
     const oldAvgSum = up.avgPrice + down.avgPrice;
@@ -320,8 +321,8 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     }
 
     // ---------- 预算执行 ----------
-    const budgetRemaining = Math.max(0, config.maxCapital - usedCapital);
-    if (budgetRemaining <= 0) return { buyUp: 0, buyDown: 0, cost, reason: "budget exhausted" };
+    const budgetRemaining = Math.max(0, config.maxCapital - cost);
+    if (budgetRemaining <= 0) return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: "budget exhausted" };
 
     const maxStepBudget = budgetRemaining * config.maxStepPercent; // e.g. 5% step allocation
     const maxUpQty = maxStepBudget / up.curPrice;
@@ -331,17 +332,31 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     buyDown = Math.min(buyDown, maxDownQty);
 
     if (buyUp < config.minBuySize && buyDown < config.minBuySize)
-        return { buyUp: 0, buyDown: 0, cost, reason: `too small after budget scaling===${ratio},${buyUp}/${buyDown},${maxUpQty}/${maxDownQty}` };
+        return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `too small after budget scaling===${ratio},${buyUp}/${buyDown},${maxUpQty}/${maxDownQty}` };
 
     // ---------- EV 保护：sumAvg 不能恶化 ----------
     const newUpAvg = newAverage(up, buyUp);
     const newDownAvg = newAverage(down, buyDown);
 
     if ((newUpAvg + newDownAvg) > oldAvgSum + config.sumTolerance) {
-        return { buyUp: 0, buyDown: 0, cost, reason: "EV reject (sumAvg worse)" };
+        return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `EV reject (sumAvg worse) newUpAvg: ${newUpAvg}, newDownAvg: ${newDownAvg}, oldAvgSum: ${oldAvgSum}` };
     }
 
-    return { buyUp, buyDown, cost, reason: "valid_buy" };
+    // ---------- 利润平衡 ----------
+    // if (buyUp > 0) {
+    //     if (buyUp + up.size > down.size) {
+    //         buyUp = down.size - up.size
+    //         buyUp = buyUp < 0 ? 0 : buyUp
+    //     }
+    // }
+    // if (buyDown > 0) {
+    //     if (buyDown + down.size > up.size) {
+    //         buyDown = up.size - down.size
+    //         buyDown = buyDown < 0 ? 0 : buyDown
+    //     }
+    // }
+
+    return { buyUp, buyDown, cost, upPnL, downPnL, reason: "valid_buy" };
 }
 
 
@@ -709,9 +724,9 @@ class Balancer {
     private currentPriceData: { upPrice: number, downPrice: number };
     private positions: MarketSnapshot;
 
-    constructor(cfg: Config, totalCapital: number = 200) {
+    constructor(cfg: Config) {
         this.cfg = cfg;
-        this.totalCapital = totalCapital;
+        this.totalCapital = this.cfg.maxCapital;
         this.priceManager = new PriceManager();
         this.currentPriceData = { upPrice: 0, downPrice: 0 }
         this.positions = this.defaultPositions()
@@ -999,7 +1014,7 @@ class Balancer {
             } catch (err) {
                 console.error('Unhandled error in runLoop:', err);
             }
-            
+
         }
     }
 
@@ -1027,21 +1042,15 @@ if (require.main === module) {
     // 允许使用环境变量覆盖（示例）
     if (process.env.MARKET_SLUG) cfg.marketSlug = process.env.MARKET_SLUG;
     if (process.env.DRY_RUN === 'false') cfg.dryRun = false;
-    if (process.env.TOTAL_CAPITAL) {
-        const totalCapital = parseFloat(process.env.TOTAL_CAPITAL);
-        const balancer = new Balancer(cfg, totalCapital);
-        balancer.runLoop().catch((e) => console.error('Fatal error', e));
-    } else {
-        // 默认200美金
-        const balancer = new Balancer(cfg, 200);
-        balancer.runLoop().catch((e) => console.error('Fatal error', e));
-    }
+
+    // 默认200美金
+    const balancer = new Balancer(cfg);
+    balancer.runLoop().catch((e) => console.error('Fatal error', e));
 }
 
 export {
     Balancer,
     PriceManager,
-    computeCorrectionV4,
     planChunks,
     exposure,
     newAverage,
