@@ -192,11 +192,11 @@ export class UserMonitor {
             }
 
             let curPrice = pos.curPrice
-            const bids = await fetchTokensBook([pos.asset])
-            if (bids && bids.length > 0) {
-                const price = parseFloat(bids[bids.length - 1].price)
-                const size = parseFloat(bids[bids.length - 1].size)
-                if (price < 0.999 || size < pos.size) {
+            const marketBids = await fetchTokensBook([pos.asset])
+            if (marketBids && marketBids.length > 0 && marketBids[0].bids && marketBids[0].bids.length > 0) {
+                const price = parseFloat(marketBids[0].bids[marketBids[0].bids.length - 1].price)
+                const size = parseFloat(marketBids[0].bids[marketBids[0].bids.length - 1].size)
+                if (isNaN(price) || isNaN(size) || price < 0.999 || size < pos.size) {
                     await sleep(1)
                     continue
                 }
@@ -205,7 +205,7 @@ export class UserMonitor {
                 await sleep(1)
                 continue
             }
-
+            console.info(`Redeem sell:`, curPrice, pos)
             enqueueOrder({
                 type: 'sell',
                 conditionId: pos.conditionId,
