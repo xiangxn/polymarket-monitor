@@ -57,10 +57,16 @@ export class PriceManager {
         try {
             console.info(`🔌 连接到 WebSocket: wss://ws-subscriptions-clob.polymarket.com/ws/market`);
 
-            this.ws = new WebSocket('wss://ws-subscriptions-clob.polymarket.com/ws/market', {
-                agent: new SocksProxyAgent(process.env.SOCKS_PROXY ?? "socks5h://127.0.0.1:1080") as any,
-                timeout: this.wsTimeout
-            });
+            if (process.env.SOCKS_PROXY) {
+                this.ws = new WebSocket('wss://ws-subscriptions-clob.polymarket.com/ws/market', {
+                    agent: new SocksProxyAgent(process.env.SOCKS_PROXY) as any,
+                    timeout: this.wsTimeout
+                });
+            } else {
+                this.ws = new WebSocket('wss://ws-subscriptions-clob.polymarket.com/ws/market', {
+                    timeout: this.wsTimeout
+                });
+            }
 
             // 设置连接超时
             const connectionTimeout = setTimeout(() => {
