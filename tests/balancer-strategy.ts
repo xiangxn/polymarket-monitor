@@ -777,8 +777,11 @@ class Balancer {
     private currentPriceData: { upPrice: number, downPrice: number };
     private positions: MarketSnapshot;
 
-    constructor(cfg: Config) {
+    constructor(cfg: Config, initPosMode?: InitialPositionMode) {
         this.cfg = cfg;
+        if (initPosMode) {
+            this.cfg.initialPositionMode = initPosMode
+        }
         this.totalCapital = this.cfg.maxCapital;
         this.priceManager = new PriceManager();
         this.currentPriceData = { upPrice: 0, downPrice: 0 }
@@ -1099,9 +1102,14 @@ if (require.main === module) {
     if (process.env.MARKET_SLUG) cfg.marketSlug = process.env.MARKET_SLUG;
     if (process.env.DRY_RUN === 'false') cfg.dryRun = false;
 
-    // 默认200美金
-    const balancer = new Balancer(cfg);
-    balancer.runLoop().catch((e) => console.error('Fatal error', e));
+    if (process.env.INIT_POS_MODE) {
+        const balancer = new Balancer(cfg, process.env.INIT_POS_MODE as InitialPositionMode);
+        balancer.runLoop().catch((e) => console.error('Fatal error', e));
+    } else {
+        const balancer = new Balancer(cfg);
+        balancer.runLoop().catch((e) => console.error('Fatal error', e));
+    }
+
 }
 
 export {
