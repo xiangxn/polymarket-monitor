@@ -11,12 +11,20 @@ const config = {
 const realStdoutFd = 1;
 const realStderrFd = 2;
 
+function procArgs(args: any[]) {
+    return args.map(arg => {
+        if (typeof arg === 'object') {
+            return JSON.stringify(arg, null, 2)
+        }
+        return arg
+    }).join(' ')
+}
 const realConsole = {
-    log: (...args: any[]) => fs.writeSync(realStdoutFd, args.join(' ') + '\n'),
-    error: (...args: any[]) => fs.writeSync(realStderrFd, args.join(' ') + '\n'),
-    warn: (...args: any[]) => fs.writeSync(realStderrFd, args.join(' ') + '\n'),
-    info: (...args: any[]) => fs.writeSync(realStdoutFd, args.join(' ') + '\n'),
-    debug: (...args: any[]) => fs.writeSync(realStdoutFd, args.join(' ') + '\n'),
+    log: (...args: any[]) => fs.writeSync(realStdoutFd, procArgs(args) + '\n'),
+    error: (...args: any[]) => fs.writeSync(realStderrFd, procArgs(args) + '\n'),
+    warn: (...args: any[]) => fs.writeSync(realStderrFd, procArgs(args) + '\n'),
+    info: (...args: any[]) => fs.writeSync(realStdoutFd, procArgs(args) + '\n'),
+    debug: (...args: any[]) => fs.writeSync(realStdoutFd, procArgs(args) + '\n'),
 };
 
 // 自定义颜色

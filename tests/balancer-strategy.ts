@@ -308,7 +308,7 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     const oldAvgSum = up.avgPrice + down.avgPrice;
 
     // 利润锁定
-    if (upPnL > 0 && downPnL > 0 && oldAvgSum < 0.95) {
+    if (upPnL > 0 && downPnL > 0 && oldAvgSum <= 0.98) {
         const ratio = upPnL / downPnL
         if (ratio > 0.9 && ratio < 1.1) {
             return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: "Locking in profits" };
@@ -1258,7 +1258,7 @@ class Balancer {
                     PnL = await this.stepOnce();
                     if (this.market && new Date(this.market.endDate).getTime() - Date.now() <= 5 * 60 * 1_000) {
                         const sellInfo = computeSellForBalanceV2(this.positions.up, this.positions.down,)
-                        console.info("sellInfo:", sellInfo)
+                        console.debug("sellInfo:", sellInfo)
                     }
                     await new Promise((res) => setTimeout(res, 1_000));
                 }
