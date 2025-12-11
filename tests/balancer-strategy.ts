@@ -294,8 +294,8 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     let buyUp = 0;
     let buyDown = 0;
     const cost = up.size * up.avgPrice + down.size * down.avgPrice
-    const upPnL = up.size - cost
-    const downPnL = down.size - cost
+    let upPnL = up.size - cost
+    let downPnL = down.size - cost
 
     // ---------- 0) 价格合理性检验 ----------
     if (
@@ -361,6 +361,12 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     if ((newUpAvg + newDownAvg) > oldAvgSum + config.sumTolerance) {
         return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `EV reject (sumAvg worse) newUpAvg: ${newUpAvg}, newDownAvg: ${newDownAvg}, oldAvgSum: ${oldAvgSum}` };
     }
+
+    // 计算新的PnL
+    const newUpCost = newUpAvg * (up.size + buyUp)
+    const newDownCost = newDownAvg * (down.size + buyDown)
+    upPnL = (up.size + buyUp) - (newUpCost + newDownCost)
+    downPnL = (down.size + buyDown) - (newUpCost + newDownCost)
 
     return { buyUp, buyDown, cost, upPnL, downPnL, reason: "valid_buy" };
 }
@@ -1251,7 +1257,8 @@ class Balancer {
                 if (this.isInitialized) {
                     PnL = await this.stepOnce();
                     if (this.market && new Date(this.market.endDate).getTime() - Date.now() <= 5 * 60 * 1_000) {
-                        computeSellForBalanceV2(this.positions.up, this.positions.down,)
+                        const sellInfo = computeSellForBalanceV2(this.positions.up, this.positions.down,)
+                        console.info("sellInfo:", sellInfo)
                     }
                     await new Promise((res) => setTimeout(res, 1_000));
                 }
@@ -1259,12 +1266,15 @@ class Balancer {
                     const endDate = new Date(this.market.endDate)
                     if (endDate.getTime() < Date.now()) {
                         const { upPrice, downPrice } = this.currentPriceData
+                        const upCost = this.positions.up.size * this.positions.up.avgPrice
+                        const downCost = this.positions.down.size * this.positions.down.avgPrice
+                        console.warn('🚨 策略已停止，因为市场已结束', "upCost:", upCost.toFixed(2), "downCost:", downCost.toFixed(2), "upPnL:", PnL.upPnL, "downPnL:", PnL.downPnL, "upPrice:", upPrice, "downPrice:", downPrice)
                         this.market = null
                         this.isInitialized = false
                         this.currentPriceData = { upPrice: 0, downPrice: 0 }
                         this.defaultPositions()
                         this.cleanup()
-                        console.warn('🚨 策略已停止，因为市场已结束', "upPnL:", PnL.upPnL, "downPnL:", PnL.downPnL, "upPrice:", upPrice, "downPrice:", downPrice)
+
                     }
                 }
             } catch (err) {
