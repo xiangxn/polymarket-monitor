@@ -316,8 +316,8 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     }
 
     // ---------- 敞口逻辑 ----------
-    const upExp = exposure(up);
-    const downExp = exposure(down);
+    const upExp = up.size
+    const downExp = down.size
     const ratio = upExp / Math.max(1e-12, downExp);
 
     // --- 检查价格是否低于均价 ---
@@ -361,20 +361,6 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     if ((newUpAvg + newDownAvg) > oldAvgSum + config.sumTolerance) {
         return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `EV reject (sumAvg worse) newUpAvg: ${newUpAvg}, newDownAvg: ${newDownAvg}, oldAvgSum: ${oldAvgSum}` };
     }
-
-    // ---------- 利润平衡 ----------
-    // if (buyUp > 0) {
-    //     if (buyUp + up.size > down.size) {
-    //         buyUp = down.size - up.size
-    //         buyUp = buyUp < 0 ? 0 : buyUp
-    //     }
-    // }
-    // if (buyDown > 0) {
-    //     if (buyDown + down.size > up.size) {
-    //         buyDown = up.size - down.size
-    //         buyDown = buyDown < 0 ? 0 : buyDown
-    //     }
-    // }
 
     return { buyUp, buyDown, cost, upPnL, downPnL, reason: "valid_buy" };
 }
@@ -762,6 +748,214 @@ async function executeTrade(market: any, outcome: Outcome, qty: number, maxPrice
     throw new Error('executeTrade not implemented — please implement using your wallet/signer');
 }
 
+type SellForBalanceResult = {
+    feasible: boolean;
+    p_min: number; // 若不可行，这是使问题可行的最低有效卖价
+    p_eff: number; // 实际用于计算的有效卖价 （考虑 fee/slippage）
+    required_s_range?: { minS: number; maxS: number };  // 如果 feasible，则返回可选 s 区间（0..1）
+    recommended_s?: number; // 推荐的 s（在区间内，取最保守的 minS
+    summary: {
+        proceeds?: number;
+        newCost?: number;
+        pnl_up?: number;
+        pnl_down?: number;
+    };
+    note?: string;
+};
+
+/**
+ * 计算在卖出 UP（按 marketPrice）时，是否存在卖出比例 s ∈ [0,1]
+ * 能同时使：
+ *   finalPnL(up)   >= targetPnl
+ *   finalPnL(down) >= targetPnl
+ *
+ * @param upShares     当前 UP 仓位数量
+ * @param downShares   当前 DOWN 仓位数量
+ * @param totalCost    当前总成本（花出去的现金）
+ * @param marketPrice  UP 当前市场卖价（0~1）
+ * @param opts.feeRate 卖出手续费率（对卖出收入）
+ * @param opts.slippage 预估滑点（绝对值，从价格扣除）
+ * @param opts.targetPnl 目标最小 PnL（默认 0）
+ */
+function computeSellForBalance(
+    up: Position,
+    down: Position,
+    marketPrice: number,
+    opts?: { feeRate?: number; slippage?: number; targetPnl?: number }
+): SellForBalanceResult {
+    const feeRate = opts?.feeRate ?? 0;
+    const slippage = opts?.slippage ?? 0;
+    const targetPnl = opts?.targetPnl ?? 0;
+    const totalCost = up.avgPrice * up.size + down.avgPrice * down.size
+
+    // 有效卖价
+    const priceAfterSlippage = Math.max(0, marketPrice - slippage);
+    const effectiveSellPrice = priceAfterSlippage * (1 - feeRate);
+
+    // 基础验证
+    if (up.size <= 0) {
+        return {
+            feasible: false,
+            p_min: Infinity,
+            p_eff: effectiveSellPrice,
+            summary: {},
+            note: "upShares must be > 0"
+        };
+    }
+    if (down.size < 0) {
+        return {
+            feasible: false,
+            p_min: Infinity,
+            p_eff: effectiveSellPrice,
+            summary: {},
+            note: "downShares must be >= 0"
+        };
+    }
+
+    // 初始 PnL
+    const initialUpPnl = up.size - totalCost;
+    const initialDownPnl = down.size - totalCost;
+
+    // ---- 计算可行的卖出比例区间 ----
+
+    // 条件：最终 downPnL >= targetPnl
+    // downFinal = downShares - (totalCost - proceeds)
+    // minSellRatio = ...
+    const denominatorDown = up.size * effectiveSellPrice;
+    const minSellRatio =
+        denominatorDown <= 0
+            ? Infinity
+            : (targetPnl - initialDownPnl) / denominatorDown;
+
+    // 条件：最终 upPnL >= targetPnl
+    // upFinal = (upShares - upShares * s) - (totalCost - proceeds)
+    // maxSellRatio = ...
+    const denominatorUp = up.size * (1 - effectiveSellPrice);
+    const maxSellRatio =
+        denominatorUp <= 0
+            ? -Infinity
+            : (initialUpPnl - targetPnl) / denominatorUp;
+
+    // 限制在 [0, 1]
+    const minS_clipped = Math.max(0, minSellRatio);
+    const maxS_clipped = Math.min(1, maxSellRatio);
+
+    const feasible =
+        minS_clipped <= maxS_clipped &&
+        Number.isFinite(minS_clipped) &&
+        Number.isFinite(maxS_clipped);
+
+    // ---- 若不可行，给出使问题可行的最低 p_min ----
+    const p_min =
+        (totalCost - down.size + targetPnl) /
+        Math.max(1e-12, up.size - down.size);
+
+    // ---- 可行情况下的推荐 s（最安全） ----
+    let recommended_s: number | undefined = undefined;
+    if (feasible) {
+        recommended_s = minS_clipped;
+    }
+
+    // ---- 计算推荐 s 后的 PnL ----
+    let proceeds: number | undefined;
+    let newCost: number | undefined;
+    let pnl_up: number | undefined;
+    let pnl_down: number | undefined;
+
+    if (feasible && recommended_s !== undefined) {
+        proceeds = up.size * recommended_s * effectiveSellPrice;
+        newCost = totalCost - proceeds;
+        pnl_up = up.size * (1 - recommended_s) - newCost;
+        pnl_down = down.size - newCost;
+    }
+
+    return {
+        feasible,
+        p_min,
+        p_eff: effectiveSellPrice,
+        required_s_range: feasible
+            ? { minS: minS_clipped, maxS: maxS_clipped }
+            : undefined,
+        recommended_s,
+        summary: { proceeds, newCost, pnl_up, pnl_down },
+        note: feasible
+            ? "Feasible: s exists in [minS, maxS]"
+            : "Not feasible at this price; need effectivePrice >= p_min"
+    };
+}
+
+interface SellResult {
+    sellUp: number;
+    sellDown: number;
+    reason: string;
+}
+export function computeSellForBalanceV2(
+    up: Position,
+    down: Position
+): SellResult {
+    // 当前 PnL
+    const totalCost = up.size * up.avgPrice + down.size * down.avgPrice;
+    const pnlUp = up.size - totalCost;
+    const pnlDown = down.size - totalCost;
+
+    // 结果
+    let sellUp = 0;
+    let sellDown = 0;
+    let reason = "";
+
+    // ---------- CASE 1: up亏损，down盈利 => 卖down ----------
+    if (pnlUp < 0 && pnlDown > 0) {
+        const deficit = -pnlUp;  // 需要填平的亏损
+
+        // 1个down能覆盖的PnL
+        const pnlPerUnitDown = down.curPrice - down.avgPrice;
+
+        if (pnlPerUnitDown > 0) {
+            sellDown = Math.min(down.size, deficit / pnlPerUnitDown);
+        }
+        reason = "down盈利覆盖up亏损";
+        return { sellUp, sellDown, reason };
+    }
+
+    // ---------- CASE 2: down亏损，up盈利 => 卖up ----------
+    if (pnlDown < 0 && pnlUp > 0) {
+        const deficit = -pnlDown;
+
+        const pnlPerUnitUp = up.curPrice - up.avgPrice;
+
+        if (pnlPerUnitUp > 0) {
+            sellUp = Math.min(up.size, deficit / pnlPerUnitUp);
+        }
+        reason = "up盈利覆盖down亏损";
+        return { sellUp, sellDown, reason };
+    }
+
+    // ---------- CASE 3: 两边都亏损 => 卖亏得较少的一侧 ----------
+    if (pnlUp < 0 && pnlDown < 0) {
+        if (pnlUp > pnlDown) {
+            // up亏得少，卖up
+            sellUp = up.size * 0.3;  // 可参数化
+            reason = "两边皆亏, 优先卖up减少最坏亏损";
+        } else {
+            sellDown = down.size * 0.3;
+            reason = "两边皆亏, 优先卖down减少最坏亏损";
+        }
+        return { sellUp, sellDown, reason };
+    }
+
+    // ---------- CASE 4: 两边都赚钱 => 通常不卖 ----------
+    if (pnlUp > 0 && pnlDown > 0) {
+        reason = "两边皆盈利, 不需要平衡敞口";
+        return { sellUp, sellDown, reason };
+    }
+
+    reason = "未匹配到情况（理论不应出现）";
+    return { sellUp, sellDown, reason };
+}
+
+
+
+
 /* ---------------------------------------------------------
    主控制循环
    --------------------------------------------------------- */
@@ -1056,6 +1250,9 @@ class Balancer {
                 // 如果已初始化，执行正常的平衡逻辑
                 if (this.isInitialized) {
                     PnL = await this.stepOnce();
+                    if (this.market && new Date(this.market.endDate).getTime() - Date.now() <= 5 * 60 * 1_000) {
+                        computeSellForBalanceV2(this.positions.up, this.positions.down,)
+                    }
                     await new Promise((res) => setTimeout(res, 1_000));
                 }
                 if (this.market) {
