@@ -170,6 +170,10 @@ function newAverage(pos: Position, newBuy: number) {
     return (pos.size * pos.avgPrice + newBuy * pos.curPrice) / Math.max(1, pos.size + newBuy);
 }
 
+function calcCost(up: Position, down: Position) {
+    return up.size * up.avgPrice + down.size * down.avgPrice;
+}
+
 /* ---------------------------------------------------------
    核心数学：计算修正性买入
    我们选择基于风险敞口的修正：
@@ -293,7 +297,7 @@ function computeCorrectionV5(up: Position, down: Position, config: Config) {
 function computeCorrectionV6(up: Position, down: Position, config: Config) {
     let buyUp = 0;
     let buyDown = 0;
-    const cost = up.size * up.avgPrice + down.size * down.avgPrice
+    const cost = calcCost(up, down)
     let upPnL = up.size - cost
     let downPnL = down.size - cost
 
@@ -359,7 +363,7 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     const newDownAvg = newAverage(down, buyDown);
 
     if ((newUpAvg + newDownAvg) > oldAvgSum + config.sumTolerance) {
-        return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `EV reject (sumAvg worse) newUpAvg: ${newUpAvg}, newDownAvg: ${newDownAvg}, oldAvgSum: ${oldAvgSum}` };
+        return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `EV reject (sumAvg worse) newUpAvg: ${newUpAvg.toFixed(2)}, newDownAvg: ${newDownAvg.toFixed(2)}, oldAvgSum: ${oldAvgSum.toFixed(2)}` };
     }
 
     // 计算新的PnL
@@ -368,7 +372,7 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     upPnL = (up.size + buyUp) - (newUpCost + newDownCost)
     downPnL = (down.size + buyDown) - (newUpCost + newDownCost)
 
-    return { buyUp, buyDown, cost, upPnL, downPnL, reason: "valid_buy" };
+    return { buyUp, buyDown, cost: newUpCost + newDownCost, upPnL, downPnL, reason: "valid_buy" };
 }
 
 
@@ -1175,7 +1179,7 @@ class Balancer {
         down.curPrice = prices.downPrice
         if (this.cfg.verbose) {
             const totalCost = up.size * up.avgPrice + down.size * down.avgPrice
-            console.info(`snapshot: newPrice=${up.curPrice}/${down.curPrice}, AVG:${up.avgPrice.toFixed(2)}+${down.avgPrice.toFixed(2)}=${(up.avgPrice + down.avgPrice).toFixed(2)}, Size=${up.size.toFixed(2)}/${down.size.toFixed(2)}, Exp=${exposure(up).toFixed(2)}/${exposure(down).toFixed(2)}, Cost=${totalCost.toFixed(2)}, PnL=${(up.size - totalCost).toFixed(2)}/${(down.size - totalCost).toFixed(2)}`);
+            console.info(`snapshot: newPrice=${up.curPrice}/${down.curPrice}, AVG:${up.avgPrice.toFixed(2)}+${down.avgPrice.toFixed(2)}=${(up.avgPrice + down.avgPrice).toFixed(2)}, Size=${up.size.toFixed(2)}/${down.size.toFixed(2)}, Cost: ${exposure(up).toFixed(2)}+${exposure(down).toFixed(2)}=${totalCost.toFixed(2)}, PnL=${(up.size - totalCost).toFixed(2)}/${(down.size - totalCost).toFixed(2)}`);
         }
 
         // 2) 计算修正
@@ -1187,9 +1191,9 @@ class Balancer {
 
         // 这里直接添加position,实盘时才需要真实下单
         if (this.cfg.dryRun) {
-            this.positions.up.avgPrice = (this.positions.up.avgPrice * this.positions.up.size + buyUp * prices.upPrice) / (this.positions.up.size + buyUp)
+            this.positions.up.avgPrice = newAverage(this.positions.up, buyUp)
             this.positions.up.size += buyUp
-            this.positions.down.avgPrice = (this.positions.down.avgPrice * this.positions.down.size + buyDown * prices.downPrice) / (this.positions.down.size + buyDown)
+            this.positions.down.avgPrice = newAverage(this.positions.down, buyDown)
             this.positions.down.size += buyDown
             console.info(`[dryRun] position==== UPSize:${(this.positions.up.size).toFixed(2)}, UPAVG:${(this.positions.up.avgPrice).toFixed(2)} DOWNSize:${this.positions.down.size.toFixed(2)}, DOWNAVG:${this.positions.down.avgPrice.toFixed(2)}, AVG:${(this.positions.down.avgPrice + this.positions.up.avgPrice).toFixed(2)}, COST:${cost.toFixed(2)}`)
         } else {
