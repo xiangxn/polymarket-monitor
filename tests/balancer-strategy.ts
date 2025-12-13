@@ -146,7 +146,7 @@ const defaultConfig: Config = {
     minBuySize: 1,
     maxBuySize: 500,
     maxStepPercent: 0.05,
-    sumTolerance: 0,
+    sumTolerance: 0.01,
 
     // WebSocket 配置
     wsReconnectInterval: 5000,       // 5秒重连间隔
@@ -319,29 +319,24 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
         }
     }
 
-    // ---------- 敞口逻辑 ----------
-    const upExp = up.size
-    const downExp = down.size
-    const ratio = upExp / Math.max(1e-12, downExp);
-
     // --- 检查价格是否低于均价 ---
     const upCheap = up.curPrice < up.avgPrice - config.opportunisticDelta;
     const downCheap = down.curPrice < down.avgPrice - config.opportunisticDelta;
 
     // --- 机会性买入（优先级 1） ---
-    if (downCheap && down.size < cost * 1.5) {
+    if (downCheap) {
         buyDown += (down.avgPrice - down.curPrice) * down.size * config.buyPressure;
     }
-    if (upCheap && up.size < cost * 1.5) {
+    if (upCheap) {
         buyUp += (up.avgPrice - up.curPrice) * up.size * config.buyPressure;
     }
 
-    // --- 敞口校正（仅在价格低廉的情况下） --- 
-    if (ratio > config.exposureMax) {
-        buyDown += ((ratio - config.exposureTarget) / ratio) * down.size * config.buyPressure;
+    // --- 敞口校正 --- 
+    if (upPnL > downPnL) {
+        buyDown += (upPnL - downPnL) / 2 * config.buyPressure;
     }
-    if (ratio < config.exposureMin) {
-        buyUp += ((1 / ratio - 1 / config.exposureTarget) * up.size * config.buyPressure);
+    if (upPnL < downPnL) {
+        buyUp += (downPnL - upPnL) / 2 * config.buyPressure;
     }
 
     // ---------- 预算执行 ----------
@@ -356,7 +351,7 @@ function computeCorrectionV6(up: Position, down: Position, config: Config) {
     buyDown = Math.min(buyDown, maxDownQty);
 
     if (buyUp < config.minBuySize && buyDown < config.minBuySize)
-        return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `too small after budget scaling===${ratio},${buyUp}/${buyDown},${maxUpQty}/${maxDownQty}` };
+        return { buyUp: 0, buyDown: 0, cost, upPnL, downPnL, reason: `too small after budget scaling===${buyUp}/${buyDown},${maxUpQty}/${maxDownQty}` };
 
     // ---------- EV 保护：sumAvg 不能恶化 ----------
     const newUpAvg = newAverage(up, buyUp);
@@ -1272,7 +1267,7 @@ class Balancer {
                         const { upPrice, downPrice } = this.currentPriceData
                         const upCost = this.positions.up.size * this.positions.up.avgPrice
                         const downCost = this.positions.down.size * this.positions.down.avgPrice
-                        console.warn('🚨 策略已停止，因为市场已结束', "upCost:", upCost.toFixed(2), "downCost:", downCost.toFixed(2), "upPnL:", PnL.upPnL, "downPnL:", PnL.downPnL, "upPrice:", upPrice, "downPrice:", downPrice)
+                        console.warn('🚨 策略已停止', "upCost:", upCost.toFixed(2), "downCost:", downCost.toFixed(2), "upPnL:", PnL.upPnL.toFixed(2), "downPnL:", PnL.downPnL.toFixed(2), "upPrice:", upPrice, "downPrice:", downPrice)
                         this.market = null
                         this.isInitialized = false
                         this.currentPriceData = { upPrice: 0, downPrice: 0 }
