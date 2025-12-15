@@ -47,11 +47,13 @@ export async function createEnv(funderAddr: string, ownerPri: string, apikey: Ap
         SEARCH_START_TIME: 0,
         SEARCH_END_TIME: 5,
 
-        MAX_ORDER_SIZE: 5,
-        ENTER_WINDOW: "[0.85,0.95]",
+        MIN_ORDER_SIZE: 10,
+        MAX_ORDER_SIZE: 10,
+        
+        ENTER_WINDOW: "[0.85,0.98]",
         MIN_END_TIME: 20,
 
-        RELATIVE_PRICE_CHANGE:0.002,
+        RELATIVE_PRICE_CHANGE: 0.002,
         FUNDER_ADDRESS: funderAddr,
         OWNER_ADDRESS_PRI: encryptor.encrypt(ownerPri),
         CLOB_API_KEY: encryptor.encrypt(apikey.key),
