@@ -466,12 +466,12 @@ export async function redeemBatch(client: RelayClient, conditionIds: string[], n
             })
         }
     })
-    if (redeemTxs.length > 0) {
+    // if (redeemTxs.length > 0) {
         const response = await client.execute(redeemTxs, JSON.stringify(metadatas) ?? "Redeem batch position");
         console.debug(`redeemBatch response:`, response)
         const result = await response.wait()
         console.debug(`redeemBatch result:`, result)
-    }
+    // }
     return metadatas
 }
 

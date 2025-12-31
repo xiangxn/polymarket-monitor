@@ -16,8 +16,9 @@ axiosInstance.defaults.httpsAgent = agent;
 axiosInstance.defaults.httpAgent = agent;
 
 import { getConfig } from "../src/config";
-import { ApiKeyCreds, Chain, ClobClient } from "@polymarket/clob-client";
+import { ApiKeyCreds, Chain, ClobClient, OrderType, Side } from "@polymarket/clob-client";
 import { Wallet } from "@ethersproject/wallet";
+import { SignatureType } from "@polymarket/order-utils";
 
 
 const config = getConfig()
@@ -34,10 +35,17 @@ async function main() {
         secret: `${config.CLOB_SECRET}`,
         passphrase: `${config.CLOB_PASS_PHRASE}`,
     };
-    const clobClient = new ClobClient(host, chainId, wallet, creds);
+    const clobClient = new ClobClient(host, chainId, wallet, creds, SignatureType.POLY_GNOSIS_SAFE, config.FUNDER_ADDRESS);
 
-    console.log(`Response: `);
-    const resp = await clobClient.getApiKeys();
+    const tokkenId = process.env.TOKEN_ID ?? ""
+    const order = await clobClient.createOrder({
+        tokenID: tokkenId,
+        price: 0.5,
+        size: 1.0,
+        side: Side.BUY,
+    })
+    console.log(order);
+    const resp = await clobClient.postOrder(order, OrderType.FOK, false)
     console.log(resp);
 }
 

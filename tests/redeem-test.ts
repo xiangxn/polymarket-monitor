@@ -1,7 +1,7 @@
 import { config as dotenvConfig } from "dotenv";
 import { resolve } from "path";
 
-dotenvConfig({ path: resolve(__dirname, "../.env") });
+dotenvConfig({ path: resolve(__dirname, "../jsaon.env") });
 
 import { initEncryptor } from "../src/config";
 initEncryptor()
@@ -16,8 +16,9 @@ axiosInstance.defaults.httpsAgent = agent;
 axiosInstance.defaults.httpAgent = agent;
 
 import { getConfig } from "../src/config";
-import { ApiKeyCreds, Chain, ClobClient } from "@polymarket/clob-client";
+import { ApiKeyCreds, Chain } from "@polymarket/clob-client";
 import { Wallet } from "@ethersproject/wallet";
+import { PolymarketClient } from "../src/polymarket";
 
 
 const config = getConfig()
@@ -34,11 +35,10 @@ async function main() {
         secret: `${config.CLOB_SECRET}`,
         passphrase: `${config.CLOB_PASS_PHRASE}`,
     };
-    const clobClient = new ClobClient(host, chainId, wallet, creds);
+    const client: PolymarketClient = new PolymarketClient()
 
-    console.log(`Response: `);
-    const resp = await clobClient.getApiKeys();
-    console.log(resp);
+    const result = await client.redeemBatch([], [], [])
+    console.log(result)
 }
 
 main();

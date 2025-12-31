@@ -5,6 +5,8 @@
     "dev": "NODE_ENV=development ts-node src/main.ts",
     "test": "ts-node tests/test.ts",
     "test:balancer": "ts-node tests/balancer-strategy.ts",
+    "test:api": "ts-node tests/createOrDeriveApiKey.ts",
+    "test:order": "ts-node tests/order-test.ts",
     "build": "tsc",
     "start": "NODE_ENV=production node dist/src/main.js",
     "start:fifteen": "NODE_ENV=development node dist/src/fifteen.js",
