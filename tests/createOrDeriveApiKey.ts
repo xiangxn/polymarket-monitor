@@ -3,8 +3,8 @@ import { resolve } from "path";
 
 dotenvConfig({ path: resolve(__dirname, "../.env") });
 
-import { initEncryptor } from "../src/config";
-initEncryptor()
+import { initConfig } from "../src/config";
+initConfig(resolve(__dirname, "../addresses.config.json"))
 
 import { axiosInstance } from "@polymarket/clob-client/dist/http-helpers/index";
 
