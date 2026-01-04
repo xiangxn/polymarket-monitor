@@ -50,10 +50,12 @@ export async function initPositions() {
         const content = await fs.readFile(path.join(dataDir, posFileName), 'utf-8');
         // 尝试解析 JSON,并加载到 positions 中
         const data = JSON.parse(content);
-        if (Array.isArray(data)) {
-            data.forEach(pos => {
-                positions.set(pos.tokenId, { ...pos });
-            });
+        if (data.address && data.address === config.FUNDER_ADDRESS) {
+            if (Array.isArray(data.positions)) {
+                data.positions.forEach((pos: any) => {
+                    positions.set(pos.tokenId, { ...pos });
+                });
+            }
         }
     } catch (err: any) {
         // 如果文件不存在或 JSON 无效，则重置为空对象
@@ -117,5 +119,5 @@ export function subPosition(tokenId: string, size: number) {
 
 export async function savePositions() {
     const poss = Array.from(positions.values());
-    await fs.writeFile(path.join(dataDir, posFileName), JSON.stringify(poss, null, 2));
+    await fs.writeFile(path.join(dataDir, posFileName), JSON.stringify({ address: config.FUNDER_ADDRESS, positions: poss }, null, 2));
 }

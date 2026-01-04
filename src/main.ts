@@ -6,8 +6,8 @@ import { resolve } from "path";
 
 dotenvConfig({ path: resolve(__dirname, `../${process.env.ENV_FILE || ''}.env`) });
 
-import { initEncryptor } from "./config";
-initEncryptor()
+import { initConfig,getConfig } from "./config";
+initConfig(resolve(__dirname, `../${process.env.ADDR_FILE || 'addresses'}.config.json`))
 
 import './utils/console'
 
@@ -91,7 +91,7 @@ async function main() {
                 e.markets.map((m, i) => ((i + 1) % 5 === 0 ? `${m.tokens[0].ask.price}\n` : `${m.tokens[0].ask.price ?? 0}`)).join(",")
             ]);
         });
-        const data = `Polymarket V1\nCash:${cash}\nPositions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
+        const data = `Polymarket V1\nAddress:${getConfig().FUNDER_ADDRESS}\nCash:${cash}\nPositions:\n${pt.toString()}\n\nEvents:\n${et.toString()}`.split("\n")
         manager.update(data)
     }
 

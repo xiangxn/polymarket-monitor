@@ -19,6 +19,10 @@ const dataDir = path.join(process.cwd(), 'data');
 let client: PolymarketClient | null = null;
 let balanceTime = 0
 
+eventBus.on('batch_finished', async (events: any[]) => {
+    client = new PolymarketClient()
+})
+
 export async function initOrderQueue() {
     const positions = getPositions()
     positions.forEach(pos => {

@@ -20,8 +20,12 @@ export class UserMonitor {
     private reconnectMaxMs = 30_000;
     private pinging = false;
     private client: PolymarketClient = new PolymarketClient()
+    private eventBus = eventBus
 
     constructor() {
+        this.eventBus.on('batch_finished', async (events: any[]) => {
+            this.client = new PolymarketClient()
+        })
     }
 
     async start() {
@@ -51,9 +55,10 @@ export class UserMonitor {
         this.pinging = true;
         while (this.running) {
             if (this.ws?.readyState === WebSocket.OPEN) {
-                this.ws?.send(JSON.stringify({
-                    type: 'PING'
-                }))
+                // this.ws?.send(JSON.stringify({
+                //     type: 'PING'
+                // }))
+                this.ws?.send('PING')
             }
             await sleep(10)
         }
@@ -138,7 +143,7 @@ export class UserMonitor {
                     }
                 }
             } catch (err) {
-                console.error('User WS onmessage parse error', err);
+                console.error('User WS onmessage parse error', err, raw.data);
             }
         }
     }
@@ -223,6 +228,7 @@ export class UserMonitor {
     async checkRedeem() {
         while (this.running) {
             try {
+                console.info("redeem:", config.FUNDER_ADDRESS)
                 let positions = await searchPositions(config.FUNDER_ADDRESS, false)
                 positions = positions.filter(p => p.size > 0)
                 const redeemPositions = positions.filter(p => p.redeemable)

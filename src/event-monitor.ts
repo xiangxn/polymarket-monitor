@@ -1,7 +1,7 @@
 import { SocksProxyAgent } from "socks-proxy-agent";
 import WebSocket from 'ws';
 import { fetchCryptoPrice, fetchUpcomingEvents, getSearchTimeUnit, getStartTime, getSymbol, getTimeUnit } from './polymarket';
-import { getConfig } from './config';
+import { getConfig, nextAddress } from './config';
 import { PolymarketEvent } from './types';
 import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
@@ -84,6 +84,7 @@ export class EventMonitor {
                 // 监控这批事件直到它们全部结束（或监控被停止）
                 await this.monitorBatch(this.events);
 
+                nextAddress()
                 eventBus.emit('batch_finished', structuredClone(this.events)) //一轮完成,清仓
                 // 这一轮结束后，给出短暂休息（避免速率问题）
                 await sleep(config.MIN_CYCLE_DELAY_MS);

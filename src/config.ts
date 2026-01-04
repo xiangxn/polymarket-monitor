@@ -1,9 +1,74 @@
+import fs from 'fs'
 import { Encryptor } from "./utils/encryptor";
 import * as readlineSync from 'readline-sync';
 
 let encryptor: Encryptor
+var currentIndex: number = 0
+var users: AddressData[] = []
+var config: any = {}
 
-export function initEncryptor() {
+interface AddressData {
+    funder_address: string;
+    owner_address_pri: string;
+    clob_api_key: string;
+    clob_secret: string;
+    clob_passphrase: string;
+    builder_api_key: string;
+    builder_secret: string;
+    builder_passphrase: string;
+}
+
+function initAddress(addrFile: string) {
+    try {
+        // 检查文件是否存在
+        if (!fs.existsSync(addrFile)) {
+            throw new Error(`❌ Address file not found: ${addrFile}`);
+        }
+
+        // 读取文件内容
+        const fileContent = fs.readFileSync(addrFile, 'utf-8');
+
+        // 解析 JSON
+        const parsedData = JSON.parse(fileContent);
+
+        // 验证数据结构
+        if (!Array.isArray(parsedData)) {
+            throw new Error(`❌ Invalid data format: Expected array, got ${typeof parsedData}`);
+        }
+
+        // 验证每个对象的字段
+        for (let i = 0; i < parsedData.length; i++) {
+            const item = parsedData[i];
+            const requiredFields: (keyof AddressData)[] = [
+                'funder_address',
+                'owner_address_pri',
+                'clob_api_key',
+                'clob_secret',
+                'clob_passphrase',
+                'builder_api_key',
+                'builder_secret',
+                'builder_passphrase'
+            ];
+
+            for (const field of requiredFields) {
+                if (!item.hasOwnProperty(field) || typeof item[field] !== 'string') {
+                    throw new Error(`❌ Missing or invalid field '${field}' in item ${i}`);
+                }
+            }
+        }
+
+        // 赋值给全局 users 数组
+        users = parsedData;
+
+        console.log(`✅ Successfully loaded ${users.length} addresses from ${addrFile}`);
+
+    } catch (error) {
+        console.error(`❌ Error reading address file: ${error}`);
+        process.exit(1);
+    }
+}
+
+export function initConfig(addrFile: string) {
     // Get password from CLI input (hidden)
     const password = readlineSync.question('Enter startup password: ', {
         hideEchoBack: true
@@ -13,9 +78,12 @@ export function initEncryptor() {
         process.exit(1);
     }
     encryptor = new Encryptor(password)
+    initAddress(addrFile)
+    config = createConfig()
 }
 
-export const getConfig = () => {
+const createConfig = () => {
+    let currentUser = users[currentIndex]
     return {
         HTTPS_PROXY: (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) ?? undefined,
         SOCKS_PROXY: process.env.SOCKS_PROXY ?? undefined,
@@ -34,11 +102,11 @@ export const getConfig = () => {
         // 操作订单
         CLOB_API_URL: process.env.CLOB_API_URL ?? "https://clob.polymarket.com",
         CHAIN_ID: parseInt(process.env.CHAIN_ID ?? "137"),
-        FUNDER_ADDRESS: process.env.FUNDER_ADDRESS ?? "",
-        OWNER_ADDRESS_PRI: encryptor!.decrypt(process.env.OWNER_ADDRESS_PRI || ''),
-        CLOB_API_KEY: encryptor!.decrypt(process.env.CLOB_API_KEY || ''),
-        CLOB_SECRET: encryptor!.decrypt(process.env.CLOB_SECRET || ''),
-        CLOB_PASS_PHRASE: encryptor!.decrypt(process.env.CLOB_PASS_PHRASE || ''),
+        FUNDER_ADDRESS: currentUser.funder_address ?? "",
+        OWNER_ADDRESS_PRI: encryptor!.decrypt(currentUser.owner_address_pri || ''),
+        CLOB_API_KEY: encryptor!.decrypt(currentUser.clob_api_key || ''),
+        CLOB_SECRET: encryptor!.decrypt(currentUser.clob_secret || ''),
+        CLOB_PASS_PHRASE: encryptor!.decrypt(currentUser.clob_passphrase || ''),
 
         // 策略配置
         RELATIVE_PRICE_CHANGE: parseFloat(process.env.RELATIVE_PRICE_CHANGE ?? "0.0005"),  // 价格相对变动幅度, 0.0005即幅度小于0.05%时不操作(幅度越小，不可预测性越强，风险越大)
@@ -70,8 +138,28 @@ export const getConfig = () => {
         CTF_ADDRESS: process.env.CTF_ADDRESS || '0x4d97dcd97ec945f40cf65f87097ace5ea0476045',
         NEG_RISK_CTF_ADDRESS: process.env.NEG_RISK_CTF_ADDRESS || '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296',
         POLYMARKET_RELAYER_URL: process.env.POLYMARKET_RELAYER_URL || 'https://relayer-v2.polymarket.com/',
-        BUILDER_API_KEY: encryptor!.decrypt(process.env.BUILDER_API_KEY || ''),
-        BUILDER_SECRET: encryptor!.decrypt(process.env.BUILDER_SECRET || ''),
-        BUILDER_PASS_PHRASE: encryptor!.decrypt(process.env.BUILDER_PASS_PHRASE || ''),
+        BUILDER_API_KEY: encryptor!.decrypt(currentUser.builder_api_key || ''),
+        BUILDER_SECRET: encryptor!.decrypt(currentUser.builder_secret || ''),
+        BUILDER_PASS_PHRASE: encryptor!.decrypt(currentUser.builder_passphrase || ''),
     }
+}
+
+export function nextAddress() {
+    currentIndex += 1
+    if (currentIndex >= users.length) {
+        currentIndex = 0
+    }
+    let c = createConfig()
+    config.FUNDER_ADDRESS = c.FUNDER_ADDRESS
+    config.OWNER_ADDRESS_PRI = c.OWNER_ADDRESS_PRI
+    config.CLOB_API_KEY = c.CLOB_API_KEY
+    config.CLOB_SECRET = c.CLOB_SECRET
+    config.CLOB_PASS_PHRASE = c.CLOB_PASS_PHRASE
+    config.BUILDER_API_KEY = c.BUILDER_API_KEY
+    config.BUILDER_SECRET = c.BUILDER_SECRET
+    config.BUILDER_PASS_PHRASE = c.BUILDER_PASS_PHRASE
+}
+
+export const getConfig = () => {
+    return config
 }
