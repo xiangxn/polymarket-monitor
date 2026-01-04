@@ -51,9 +51,10 @@ export class UserMonitor {
         this.pinging = true;
         while (this.running) {
             if (this.ws?.readyState === WebSocket.OPEN) {
-                this.ws?.send(JSON.stringify({
-                    type: 'PING'
-                }))
+                // this.ws?.send(JSON.stringify({
+                //     type: 'PING'
+                // }))
+                this.ws?.send('PING')
             }
             await sleep(10)
         }
