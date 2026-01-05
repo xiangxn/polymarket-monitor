@@ -7,6 +7,8 @@ import { ethers } from 'ethers';
 import { initTelegramBot, sendAlert } from '../src/notifiers/telegram-notifier';
 import { BalanceInfo, getBalancesBatch, getPositionsBatch } from "./balance-helper";
 
+import BALANCE_ADDRESS from '../all_address.json'
+
 // 配置项
 interface Config {
     rpcUrl: string;
@@ -55,24 +57,25 @@ class BalanceMonitor {
         });
 
         // 为每个地址生成报告
-        Object.entries(balancesByAddress).forEach(([address, tokenBalances]) => {
-            message += `<b>地址:</b> <a href="https://polygonscan.com/address/${address}">${address}</a>\n`;
+        // Object.entries(balancesByAddress).forEach(([address, tokenBalances]) => {
+        //     message += `<b>地址:</b> <a href="https://polygonscan.com/address/${address}">${address}</a>\n`;
 
-            tokenBalances.forEach(balance => {
-                if (parseFloat(balance.balanceFormatted) > 0) {
-                    message += `  ${balance.token.symbol}: ${balance.balanceFormatted}\n`;
-                }
-            });
+        //     tokenBalances.forEach(balance => {
+        //         if (parseFloat(balance.balanceFormatted) > 0) {
+        //             message += `  ${balance.token.symbol}: ${balance.balanceFormatted}\n`;
+        //         }
+        //     });
 
-            message += '\n';
-        });
+        //     message += '\n';
+        // });
 
         // 汇总信息
         const totalTokens = new Set(balances.map(b => b.token.symbol)).size;
         const totalAddresses = Object.keys(balancesByAddress).length;
         const nonZeroBalances = balances.filter(b => parseFloat(b.balanceFormatted) > 0).length;
+        const totalBalance = balances.reduce((sum, balance) => sum + parseFloat(balance.balanceFormatted), 0);
 
-        message += `<i>统计: ${totalAddresses}个地址, ${totalTokens}种代币, ${nonZeroBalances}个非零余额</i>`;
+        message += `<i>统计: ${totalAddresses}个地址, ${totalTokens}种代币, ${nonZeroBalances}个非零余额, 总余额: ${totalBalance.toFixed(2)}</i>`;
 
         return message;
     }
@@ -115,7 +118,7 @@ async function main() {
         rpcUrl: process.env.RPC_URL || 'https://polygon-rpc.com',
         telegramBotToken: process.env.TG_API_KEY || '',
         telegramChatId: process.env.TG_CHAT_ID || '',
-        addresses: JSON.parse(process.env.CHECK_BALANCE_ADDRESS || '[]'),
+        addresses: BALANCE_ADDRESS, //JSON.parse(process.env.CHECK_BALANCE_ADDRESS || '[]'),
         tokenContracts: ['0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174']
     };
 
