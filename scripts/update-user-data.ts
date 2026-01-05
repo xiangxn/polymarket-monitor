@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface AddressData {
+export interface AddressData {
     funder_address: string;
     owner_address_pri: string;
     clob_api_key: string;
@@ -142,4 +142,6 @@ async function main() {
     }
 }
 
-main().catch(console.error);
+if (require.main === module) {
+    main().catch(console.error);
+}

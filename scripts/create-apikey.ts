@@ -49,7 +49,7 @@ export async function createEnv(funderAddr: string, ownerPri: string, apikey: Ap
 
         MIN_ORDER_SIZE: 10,
         MAX_ORDER_SIZE: 10,
-        
+
         ENTER_WINDOW: "[0.85,0.98]",
         MIN_END_TIME: 20,
 
@@ -90,4 +90,7 @@ async function main() {
 
     await createEnv(funderAddr, privateKey, apikey, builderApiKey, encryptor, envName)
 }
-main();
+if (require.main === module) {
+    main();
+}
+
