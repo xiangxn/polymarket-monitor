@@ -2,7 +2,7 @@ import { SocksProxyAgent } from "socks-proxy-agent";
 import { fetchWithProxy, sleep } from "./utils/helper";
 import { CryptoPriceSymbol, CryptoPriceUint, MetadataType, PolymarketEvent, PostOrderResult, Token } from "./types";
 
-import { getConfig } from './config';
+import { getConfig, ConfigType } from './config';
 import { SignatureType } from "@polymarket/order-utils";
 import { ApiKeyCreds, Chain, ClobClient, OrderType, Side } from "@polymarket/clob-client";
 import { OperationType, RelayClient, SafeTransaction } from "@polymarket/builder-relayer-client";
@@ -13,7 +13,6 @@ import { ethers } from "ethers";
 import { HashZero } from "@ethersproject/constants"
 
 const config = getConfig()
-type ConfigType = typeof config
 
 export function convertTokens(market: any) {
     const tokens: Token[] = []
@@ -223,8 +222,13 @@ export class PolymarketClient {
     private relayer: RelayClient
     private provider: ethers.providers.JsonRpcProvider
 
-    constructor() {
-        this.config = getConfig()
+    constructor(config?: ConfigType) {
+        if (config === undefined) {
+            this.config = getConfig()
+        } else {
+            this.config = config
+        }
+
         this.provider = new ethers.providers.JsonRpcProvider(this.config.CHAIN_RPC_URL);
         const wallet = new ethers.Wallet(this.config.OWNER_ADDRESS_PRI, this.provider);
         const chainId = this.config.CHAIN_ID as Chain;

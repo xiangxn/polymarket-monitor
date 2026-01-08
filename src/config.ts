@@ -68,6 +68,10 @@ function initAddress(addrFile: string) {
     }
 }
 
+export function getUserCount() {
+    return users.length
+}
+
 export function initConfig(addrFile: string) {
     // Get password from CLI input (hidden)
     const password = readlineSync.question('Enter startup password: ', {
@@ -82,8 +86,14 @@ export function initConfig(addrFile: string) {
     config = createConfig()
 }
 
-const createConfig = () => {
-    let currentUser = users[currentIndex]
+export const createConfig = (index?: number) => {
+    let currentUser: AddressData | undefined = undefined
+    if (index === undefined) {
+        index = currentIndex
+    }
+    if (index >= 0 && index < users.length) {
+        currentUser = users[index]
+    }
     return {
         HTTPS_PROXY: (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) ?? undefined,
         SOCKS_PROXY: process.env.SOCKS_PROXY ?? undefined,
@@ -102,11 +112,11 @@ const createConfig = () => {
         // 操作订单
         CLOB_API_URL: process.env.CLOB_API_URL ?? "https://clob.polymarket.com",
         CHAIN_ID: parseInt(process.env.CHAIN_ID ?? "137"),
-        FUNDER_ADDRESS: currentUser.funder_address ?? "",
-        OWNER_ADDRESS_PRI: encryptor!.decrypt(currentUser.owner_address_pri || ''),
-        CLOB_API_KEY: encryptor!.decrypt(currentUser.clob_api_key || ''),
-        CLOB_SECRET: encryptor!.decrypt(currentUser.clob_secret || ''),
-        CLOB_PASS_PHRASE: encryptor!.decrypt(currentUser.clob_passphrase || ''),
+        FUNDER_ADDRESS: currentUser?.funder_address ?? "",
+        OWNER_ADDRESS_PRI: encryptor?.decrypt(currentUser?.owner_address_pri || '') || '',
+        CLOB_API_KEY: encryptor?.decrypt(currentUser?.clob_api_key || '') || '',
+        CLOB_SECRET: encryptor?.decrypt(currentUser?.clob_secret || '') || '',
+        CLOB_PASS_PHRASE: encryptor?.decrypt(currentUser?.clob_passphrase || '') || '',
 
         // 策略配置
         RELATIVE_PRICE_CHANGE: parseFloat(process.env.RELATIVE_PRICE_CHANGE ?? "0.0005"),  // 价格相对变动幅度, 0.0005即幅度小于0.05%时不操作(幅度越小，不可预测性越强，风险越大)
@@ -138,9 +148,9 @@ const createConfig = () => {
         CTF_ADDRESS: process.env.CTF_ADDRESS || '0x4d97dcd97ec945f40cf65f87097ace5ea0476045',
         NEG_RISK_CTF_ADDRESS: process.env.NEG_RISK_CTF_ADDRESS || '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296',
         POLYMARKET_RELAYER_URL: process.env.POLYMARKET_RELAYER_URL || 'https://relayer-v2.polymarket.com/',
-        BUILDER_API_KEY: encryptor!.decrypt(currentUser.builder_api_key || ''),
-        BUILDER_SECRET: encryptor!.decrypt(currentUser.builder_secret || ''),
-        BUILDER_PASS_PHRASE: encryptor!.decrypt(currentUser.builder_passphrase || ''),
+        BUILDER_API_KEY: encryptor?.decrypt(currentUser?.builder_api_key || '') || '',
+        BUILDER_SECRET: encryptor?.decrypt(currentUser?.builder_secret || '') || '',
+        BUILDER_PASS_PHRASE: encryptor?.decrypt(currentUser?.builder_passphrase || '') || '',
     }
 }
 
@@ -163,3 +173,6 @@ export function nextAddress() {
 export const getConfig = () => {
     return config
 }
+
+const cfg = createConfig()  // 创建类型并导出
+export type ConfigType = typeof cfg

@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { fetchMarketBySlug, fetchTokensBook, PolymarketClient, searchPositions } from './polymarket';
-import { getConfig } from './config';
+import { getConfig, getUserCount, createConfig } from './config';
 import { chunkArray, sleep } from './utils/helper';
 import { eventBus } from './event-bus';
 import { getCash, setCash } from './position';
@@ -148,7 +148,10 @@ export class UserMonitor {
         }
     }
 
-    private async redeemPositions(redeemPositions: any[]) {
+    private async redeemPositions(redeemPositions: any[], client?: PolymarketClient) {
+        if (!client) {
+            client = this.client
+        }
         const chunks = chunkArray(redeemPositions, 5)
         for (const chunk of chunks) {
             const conditionIds = chunk.map(p => p.conditionId as string)
@@ -170,7 +173,7 @@ export class UserMonitor {
                 size: p.size
             } as MetadataType))
 
-            const mds = await this.client.redeemBatch(conditionIds, negRisks, amounts, metadatas)
+            const mds = await client.redeemBatch(conditionIds, negRisks, amounts, metadatas)
             if (mds && mds.length > 0) {
                 // 处理mds,获取市场数据判断盈亏,补充order csv
                 await Promise.all(mds.map(md => this.checkProfitLoss(md)))
@@ -226,17 +229,22 @@ export class UserMonitor {
     }
 
     async checkRedeem() {
+        let addresCount = getUserCount()
+        let index = 0
         while (this.running) {
             try {
-                console.info("redeem:", config.FUNDER_ADDRESS)
-                let positions = await searchPositions(config.FUNDER_ADDRESS, false)
+                let cfg = createConfig(index)
+                console.info("redeem:", cfg.FUNDER_ADDRESS)
+                let positions = await searchPositions(cfg.FUNDER_ADDRESS, false)
                 positions = positions.filter(p => p.size > 0)
                 const redeemPositions = positions.filter(p => p.redeemable)
-                const sellPositions = positions.filter(p => p.redeemable === false)
-                await this.redeemPositions(redeemPositions) // redeem
-                await this.sellPositions(sellPositions);    // sell
+                await this.redeemPositions(redeemPositions, new PolymarketClient(cfg)) // redeem
 
                 await sleep(60)
+                index += 1
+                if (index >= addresCount) {
+                    index = 0
+                }
             } catch (err) {
                 console.error(`checkRedeem error: ${JSON.stringify(err)}`)
                 await sleep(5)
