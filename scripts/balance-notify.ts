@@ -5,7 +5,7 @@ dotenvConfig({ path: resolve(__dirname, `../${process.env.ENV_FILE || ''}.env`) 
 
 import { ethers } from 'ethers';
 import { initTelegramBot, sendAlert } from '../src/notifiers/telegram-notifier';
-import { BalanceInfo, getBalancesBatch, getPositionsBatch } from "./balance-helper";
+import { BalanceInfo, getBalancesBatch, getPositionsBatch } from "../src/utils/balance-helper";
 
 // 配置项
 interface Config {

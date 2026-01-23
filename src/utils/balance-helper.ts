@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { readFile } from 'fs/promises';
-import { chunkArray, fetchWithProxy } from '../src/utils/helper';
+import { chunkArray, fetchWithProxy } from './helper';
 
 // ERC20合约ABI（简化版，只包含我们需要的方法）
 export const ERC20_ABI = [

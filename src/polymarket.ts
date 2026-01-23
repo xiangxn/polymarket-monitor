@@ -11,6 +11,7 @@ import { axiosInstance } from '@polymarket/clob-client/dist/http-helpers/index'
 import { Interface } from "@ethersproject/abi";
 import { ethers } from "ethers";
 import { HashZero } from "@ethersproject/constants"
+import { getBalancesBatch } from "./utils/balance-helper";
 
 const config = getConfig()
 type ConfigType = typeof config
@@ -321,25 +322,11 @@ export class PolymarketClient {
         if (!funder) {
             funder = this.config.FUNDER_ADDRESS
         }
-        const ERC20_ABI = [
-            "function balanceOf(address owner) view returns (uint256)",
-            "function decimals() view returns (uint8)",
-            "function symbol() view returns (string)"
-        ];
-        try {
-            const token = new ethers.Contract(this.config.USDC_ADDRESS, ERC20_ABI, this.provider);
-            const [decimals, symbol, rawBalance] = await Promise.all([
-                token.decimals().catch(() => 18), // 若合约没有 decimals，回退 18（很少见）
-                token.symbol().catch(() => ""),
-                token.balanceOf(funder)
-            ]);
-            const balance = ethers.utils.formatUnits(rawBalance, decimals);
-            console.debug(`${funder} balance: ${balance} ${symbol}`);
-            return +parseFloat(balance).toFixed(2)
-        } catch (err: any) {
-            console.error(`getBalance error: ${err.message ? err.message : err}`)
-            return 0
-        }
+        const result = await getBalancesBatch(this.provider, [this.config.USDC_ADDRESS], [funder])
+        if (result.length < 1) return 0
+
+        console.debug(`${funder} balance: ${result[0].balanceFormatted} ${result[0].token.symbol}`);
+        return +parseFloat(result[0].balanceFormatted).toFixed(2)
     }
 }
 

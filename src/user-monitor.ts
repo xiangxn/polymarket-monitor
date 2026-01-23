@@ -231,7 +231,7 @@ export class UserMonitor {
                 await this.redeemPositions(redeemPositions) // redeem
                 await this.sellPositions(sellPositions);    // sell
 
-                await sleep(60)
+                await sleep(5*60)
             } catch (err) {
                 console.error(`checkRedeem error: ${JSON.stringify(err)}`)
                 await sleep(5)

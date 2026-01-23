@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import Table from 'cli-table3';
-import { BalanceInfo, getBalancesBatch, getPositionsBatch, loadJson } from './balance-helper';
+import { BalanceInfo, getBalancesBatch, getPositionsBatch, loadJson } from '../src/utils/balance-helper';
 import dotenv from "dotenv"
 dotenv.config()
 
