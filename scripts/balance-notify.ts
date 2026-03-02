@@ -115,7 +115,7 @@ class BalanceMonitor {
 async function main() {
     // 从环境变量或配置文件读取配置
     const config: Config = {
-        rpcUrl: process.env.RPC_URL || 'https://polygon-rpc.com',
+        rpcUrl: process.env.RPC_URL || 'https://polygon.drpc.org',
         telegramBotToken: process.env.TG_API_KEY || '',
         telegramChatId: process.env.TG_CHAT_ID || '',
         addresses: BALANCE_ADDRESS, //JSON.parse(process.env.CHECK_BALANCE_ADDRESS || '[]'),

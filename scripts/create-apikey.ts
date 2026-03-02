@@ -60,7 +60,7 @@ export async function createEnv(funderAddr: string, ownerPri: string, apikey: Ap
         CLOB_SECRET: encryptor.encrypt(apikey.secret),
         CLOB_PASS_PHRASE: encryptor.encrypt(apikey.passphrase),
 
-        // CHAIN_RPC_URL: "https://polygon-rpc.com/",
+        // CHAIN_RPC_URL: "https://polygon.drpc.org/",
         // USDC_ADDRESS: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
         // CTF_ADDRESS: "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
         // NEG_RISK_CTF_ADDRESS: "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296",

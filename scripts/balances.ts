@@ -124,7 +124,7 @@ async function main() {
     try { addresses = await loadJson(addresFile) } catch { }
 
     // 从环境变量获取RPC URL，如果没有则使用默认值
-    const RPC_URL = process.env.RPC_URL || 'https://polygon-rpc.com';
+    const RPC_URL = process.env.RPC_URL || 'https://polygon.drpc.org';
 
     // 要查询的地址列表（可以修改为从文件读取或参数传入）
     let envAddresses = JSON.parse(process.env.CHECK_BALANCE_ADDRESS || '[]');
