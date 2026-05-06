@@ -11,7 +11,7 @@ interface AddressSummary {
 }
 
 // 常见ERC20代币列表
-const COMMON_TOKENS = ['0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174']
+const COMMON_TOKENS = ['0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB']
 
 
 class ERC20BalanceChecker {
@@ -124,7 +124,7 @@ async function main() {
     try { addresses = await loadJson(addresFile) } catch { }
 
     // 从环境变量获取RPC URL，如果没有则使用默认值
-    const RPC_URL = process.env.RPC_URL || 'https://polygon-rpc.com';
+    const RPC_URL = process.env.RPC_URL || 'https://polygon.drpc.org';
 
     // 要查询的地址列表（可以修改为从文件读取或参数传入）
     let envAddresses = JSON.parse(process.env.CHECK_BALANCE_ADDRESS || '[]');
