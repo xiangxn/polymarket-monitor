@@ -11,7 +11,7 @@ interface AddressSummary {
 }
 
 // 常见ERC20代币列表
-const COMMON_TOKENS = ['0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174']
+const COMMON_TOKENS = ['0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB']
 
 
 class ERC20BalanceChecker {
