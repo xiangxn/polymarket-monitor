@@ -119,7 +119,7 @@ async function main() {
         telegramBotToken: process.env.TG_API_KEY || '',
         telegramChatId: process.env.TG_CHAT_ID || '',
         addresses: BALANCE_ADDRESS, //JSON.parse(process.env.CHECK_BALANCE_ADDRESS || '[]'),
-        tokenContracts: ['0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174']
+        tokenContracts: ['0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB']
     };
 
     // 检查必要配置
