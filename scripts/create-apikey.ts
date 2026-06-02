@@ -40,7 +40,7 @@ export async function createBuilderApiKey(wallet: Wallet, creds: ApiKeyCreds) {
     return resp
 }
 
-export async function createEnv(funderAddr: string, ownerPri: string, apikey: ApiKeyCreds, builderApikey: ApiKeyCreds, encryptor: Encryptor, envName: string) {
+export async function createEnv(funderAddr: string, ownerPri: string, apikey: ApiKeyCreds, encryptor: Encryptor, envName: string) {
     const env = {
         MIN_BALANCE: 140,
         MIN_VOLUME: 1000,
@@ -65,9 +65,9 @@ export async function createEnv(funderAddr: string, ownerPri: string, apikey: Ap
         // CTF_ADDRESS: "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
         // NEG_RISK_CTF_ADDRESS: "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296",
         // POLYMARKET_RELAYER_URL: "https://relayer-v2.polymarket.com/",
-        BUILDER_API_KEY: encryptor.encrypt(builderApikey.key),
-        BUILDER_SECRET: encryptor.encrypt(builderApikey.secret),
-        BUILDER_PASS_PHRASE: encryptor.encrypt(builderApikey.passphrase)
+        // BUILDER_API_KEY: encryptor.encrypt(builderApikey.key),
+        // BUILDER_SECRET: encryptor.encrypt(builderApikey.secret),
+        // BUILDER_PASS_PHRASE: encryptor.encrypt(builderApikey.passphrase)
     }
     const envStr = Object.entries(env).map(([key, value]) => `${key}=${value}`).join('\n')
     await fs.writeFile(`${envName}.env`, envStr)
@@ -82,13 +82,19 @@ async function main() {
     const pwd = readlineSync.question('Enter startup password: ', {
         hideEchoBack: true
     });
+    const isCreateEnv = readlineSync.question('Create env?')
 
     const wallet = new ethers.Wallet(`${privateKey}`);
     const encryptor = new Encryptor(pwd);
     const apikey = await createApiKey(wallet);
-    const builderApiKey = await createBuilderApiKey(wallet, apikey)
+    // const builderApiKey = await createBuilderApiKey(wallet, apikey)
 
-    await createEnv(funderAddr, privateKey, apikey, builderApiKey, encryptor, envName)
+    if (isCreateEnv === "yes") {
+        await createEnv(funderAddr, privateKey, apikey, encryptor, envName)
+    }else{
+        console.log("apikey: ",apikey)
+    }
+
 }
 if (require.main === module) {
     main();
